@@ -15,6 +15,9 @@ ENV/
 *.swp
 *.swo
 
+# Keep .cursor config
+!.cursor/
+
 # Data files (keep structure, ignore contents)
 data/inventories/*.yaml
 data/inventories/*.json

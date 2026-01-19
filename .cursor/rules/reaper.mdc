@@ -1,0 +1,41 @@
+---
+description: REAPER project rules and conventions
+globs: ["**/*.py", "**/*.ps1", "**/*.yaml"]
+alwaysApply: true
+---
+
+# REAPER Project Rules
+
+## Code Style
+
+- Python: Follow PEP 8, use type hints
+- PowerShell: Use approved verbs, comment complex logic
+- YAML: 2-space indent, quote strings with special chars
+
+## Architecture
+
+- Collectors output to `data/inventories/`
+- Analyzers output to `data/analysis/`
+- Executors log to `data/audit_logs/`
+- All config in `config/` directory
+
+## Safety Requirements
+
+- Never modify items in `critical_keep_list`
+- Always generate rollback commands for changes
+- Require dry-run before execute
+- Log all changes with before/after state
+
+## Naming
+
+- Collector classes: `{Type}Collector`
+- Filter methods: `filter_{type}()`
+- PowerShell scripts: verb-noun.ps1
+
+## Testing Changes
+
+1. Run `collect_inventory.py` first
+2. Run `analyze_suspects.py` 
+3. Review `data/analysis/` output
+4. Test with `-DryRun` flag
+5. Execute only after review

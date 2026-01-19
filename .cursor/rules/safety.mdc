@@ -1,0 +1,34 @@
+---
+description: Safety rules for system modifications
+globs: ["**/execute*.ps1", "**/service_manager.ps1", "**/app_remover.ps1"]
+alwaysApply: true
+---
+
+# Safety Rules
+
+## Before Any System Change
+
+1. Check against `critical_keep_list` in manifest.yaml
+2. Get current state for rollback
+3. Log the planned action
+4. Require explicit confirmation or -Execute flag
+
+## Forbidden Actions
+
+- NEVER disable: csrss, lsass, services, svchost, winlogon
+- NEVER remove: Windows Defender, Firewall, core networking
+- NEVER modify without logging
+
+## Rollback Requirements
+
+Every change must generate a rollback command:
+```powershell
+# Example
+Set-Service -Name "ServiceName" -StartupType $beforeState
+```
+
+## Error Handling
+
+- Catch all exceptions in PowerShell
+- Log failures with full error message
+- Continue to next item on failure (don't abort batch)
