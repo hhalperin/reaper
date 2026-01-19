@@ -1,0 +1,71 @@
+# Windows Optimization Toolkit - Settings
+
+# Current aggressiveness level
+# Options: light, moderate, aggressive
+aggressiveness_level: light
+
+# System information (auto-populated on first run)
+system:
+  os_version: null
+  os_build: null
+  edition: null
+
+# Paths
+paths:
+  inventories: data/inventories
+  analysis: data/analysis
+  audit_logs: data/audit_logs
+
+# Inventory collection settings
+inventory:
+  # Include processes with less than this CPU% (filter noise)
+  min_cpu_percent: 0.0
+  # Include processes with less than this memory MB
+  min_memory_mb: 0
+  # Collect command line arguments (may contain sensitive data)
+  collect_cmdline: true
+  # Attempt to get digital signature info (slower but more accurate)
+  collect_signatures: true
+
+# Suspect filter settings
+suspect_filter:
+  # Flag processes using more than this % of total RAM
+  high_memory_threshold_percent: 2.0
+  # Flag processes using more than this % CPU (averaged)
+  high_cpu_threshold_percent: 5.0
+  # Always flag non-Microsoft signed processes
+  flag_non_microsoft: true
+  # Patterns to always flag as suspect (regex)
+  bloatware_patterns:
+    - "(?i)chroma"
+    - "(?i)synapse"
+    - "(?i)icue"
+    - "(?i)corsair"
+    - "(?i)logitech.*gaming"
+    - "(?i)razer"
+    - "(?i)copilot"
+    - "(?i)recall"
+    - "(?i)cortana"
+    - "(?i)gamebar"
+    - "(?i)xbox"
+    - "(?i)yourphone"
+    - "(?i)teams"
+    - "(?i)onedrive"
+    - "(?i)edge.*update"
+    - "(?i)adobe.*update"
+
+# Execution settings
+execution:
+  # Always require dry-run before execute
+  require_dry_run: true
+  # Create system restore point before changes
+  create_restore_point: true
+  # Maximum changes per session (safety limit)
+  max_changes_per_session: 50
+
+# Protection settings
+protection:
+  # Enable post-update monitoring
+  enabled: true
+  # Check interval after Windows Update (minutes)
+  check_delay_minutes: 5

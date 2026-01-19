@@ -1,0 +1,16 @@
+# Windows Optimization Toolkit - Python Dependencies
+
+# Process and system information
+psutil>=5.9.0
+
+# Windows Management Instrumentation
+wmi>=1.5.1
+
+# Configuration file parsing
+PyYAML>=6.0
+
+# Beautiful CLI output
+rich>=13.0.0
+
+# Date/time handling
+python-dateutil>=2.8.0

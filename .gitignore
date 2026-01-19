@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Data files (keep structure, ignore contents)
+data/inventories/*.yaml
+data/inventories/*.json
+data/analysis/*.yaml
+data/analysis/*.json
+data/audit_logs/*.log
+data/audit_logs/*.ps1
+
+# But keep .gitkeep files
+!data/inventories/.gitkeep
+!data/analysis/.gitkeep
+!data/audit_logs/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Backup files
+*.bak
+*.backup
+*.reg.backup

@@ -1,0 +1,443 @@
+# Windows Optimization Toolkit - Known Process Database
+# Pre-researched processes with recommendations
+
+# Format:
+# process_name:
+#   category: core|system|driver|security|utility|bloatware|ai_feature|telemetry
+#   publisher: string
+#   purpose: string
+#   recommendation: KEEP|DISABLE|REMOVE
+#   safety_rating: CRITICAL|SAFE|CAUTION
+#   notes: string
+
+# =============================================================================
+# CRITICAL - Never disable these
+# =============================================================================
+
+System:
+  category: core
+  publisher: Microsoft
+  purpose: Windows NT kernel and system
+  recommendation: KEEP
+  safety_rating: CRITICAL
+  notes: Core Windows kernel process
+
+csrss.exe:
+  category: core
+  publisher: Microsoft
+  purpose: Client/Server Runtime Subsystem - handles console windows and thread creation
+  recommendation: KEEP
+  safety_rating: CRITICAL
+  notes: Windows will not boot without this
+
+wininit.exe:
+  category: core
+  publisher: Microsoft
+  purpose: Windows Initialization - starts critical system services
+  recommendation: KEEP
+  safety_rating: CRITICAL
+  notes: Required for Windows startup
+
+services.exe:
+  category: core
+  publisher: Microsoft
+  purpose: Service Control Manager - manages Windows services
+  recommendation: KEEP
+  safety_rating: CRITICAL
+  notes: All services depend on this
+
+lsass.exe:
+  category: security
+  publisher: Microsoft
+  purpose: Local Security Authority - handles authentication and security policies
+  recommendation: KEEP
+  safety_rating: CRITICAL
+  notes: Required for login and security
+
+svchost.exe:
+  category: core
+  publisher: Microsoft
+  purpose: Service Host - hosts multiple Windows services
+  recommendation: KEEP
+  safety_rating: CRITICAL
+  notes: Many instances normal, each hosts different services
+
+dwm.exe:
+  category: core
+  publisher: Microsoft
+  purpose: Desktop Window Manager - handles visual effects and window composition
+  recommendation: KEEP
+  safety_rating: CRITICAL
+  notes: Required for Windows desktop
+
+explorer.exe:
+  category: core
+  publisher: Microsoft
+  purpose: Windows Explorer shell - taskbar, file explorer, desktop
+  recommendation: KEEP
+  safety_rating: CRITICAL
+  notes: Primary Windows shell
+
+MsMpEng.exe:
+  category: security
+  publisher: Microsoft
+  purpose: Windows Defender Antimalware Service
+  recommendation: KEEP
+  safety_rating: CRITICAL
+  notes: Primary security protection
+
+SecurityHealthService.exe:
+  category: security
+  publisher: Microsoft
+  purpose: Windows Security Health Service
+  recommendation: KEEP
+  safety_rating: CRITICAL
+  notes: Monitors system security status
+
+# =============================================================================
+# SYSTEM SERVICES - Generally keep but some can be adjusted
+# =============================================================================
+
+SearchIndexer.exe:
+  category: system
+  publisher: Microsoft
+  purpose: Windows Search indexing service
+  recommendation: KEEP
+  safety_rating: SAFE
+  notes: Disable only if you never use Windows Search
+
+spoolsv.exe:
+  category: system
+  publisher: Microsoft
+  purpose: Print Spooler - manages print jobs
+  recommendation: KEEP
+  safety_rating: SAFE
+  notes: Can disable if no printers used
+
+WUDFHost.exe:
+  category: driver
+  publisher: Microsoft
+  purpose: Windows User-Mode Driver Framework Host
+  recommendation: KEEP
+  safety_rating: SAFE
+  notes: Hosts user-mode drivers
+
+audiodg.exe:
+  category: system
+  publisher: Microsoft
+  purpose: Windows Audio Device Graph Isolation
+  recommendation: KEEP
+  safety_rating: CRITICAL
+  notes: Required for audio
+
+# =============================================================================
+# AI FEATURES - Candidates for removal
+# =============================================================================
+
+Copilot:
+  category: ai_feature
+  publisher: Microsoft
+  purpose: AI assistant integrated into Windows
+  recommendation: REMOVE
+  safety_rating: SAFE
+  notes: Uses resources constantly, can be fully disabled via registry
+
+Microsoft.Windows.Ai.Copilot.Provider:
+  category: ai_feature
+  publisher: Microsoft
+  purpose: Copilot provider service
+  recommendation: REMOVE
+  safety_rating: SAFE
+  notes: Background service for Copilot
+
+Recall:
+  category: ai_feature
+  publisher: Microsoft
+  purpose: AI-powered activity history and search
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Privacy concern, uses significant resources
+
+AiHost.exe:
+  category: ai_feature
+  publisher: Microsoft
+  purpose: Windows AI Host process
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Hosts AI features
+
+# =============================================================================
+# TELEMETRY - Candidates for disabling
+# =============================================================================
+
+DiagTrack:
+  category: telemetry
+  publisher: Microsoft
+  purpose: Connected User Experiences and Telemetry
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Primary telemetry service, can be set to Manual
+
+CompatTelRunner.exe:
+  category: telemetry
+  publisher: Microsoft
+  purpose: Microsoft Compatibility Telemetry
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Collects compatibility data
+
+dmwappushservice:
+  category: telemetry
+  publisher: Microsoft
+  purpose: Device Management Wireless Application Protocol Push
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: WAP push for telemetry
+
+# =============================================================================
+# RGB/GAMING SOFTWARE - Usually safe to disable
+# =============================================================================
+
+Razer Synapse:
+  category: utility
+  publisher: Razer Inc.
+  purpose: Razer device configuration and RGB control
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Devices work without it, just lose RGB sync and macros
+
+RzChromaSDKService:
+  category: utility
+  publisher: Razer Inc.
+  purpose: Razer Chroma RGB SDK service
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Only needed for RGB synchronization in games
+
+RzChromaStreamServer:
+  category: utility
+  publisher: Razer Inc.
+  purpose: Razer Chroma streaming service
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: For streaming RGB effects, rarely used
+
+iCUE.exe:
+  category: utility
+  publisher: Corsair
+  purpose: Corsair device configuration and RGB control
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Devices work without it
+
+CorsairService.exe:
+  category: utility
+  publisher: Corsair
+  purpose: Corsair background service
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Background RGB and device management
+
+LGHUBUpdaterService:
+  category: utility
+  publisher: Logitech
+  purpose: Logitech G Hub update service
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Only needed for updates
+
+# =============================================================================
+# BLOATWARE - Safe to remove
+# =============================================================================
+
+YourPhone.exe:
+  category: bloatware
+  publisher: Microsoft
+  purpose: Phone Link app for connecting to mobile devices
+  recommendation: REMOVE
+  safety_rating: SAFE
+  notes: Remove if you don't link your phone
+
+GameBar:
+  category: bloatware
+  publisher: Microsoft
+  purpose: Xbox Game Bar overlay
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Can interfere with games, disable if not used
+
+XboxGamingOverlay:
+  category: bloatware
+  publisher: Microsoft
+  purpose: Xbox gaming overlay process
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Part of Game Bar
+
+Microsoft.549981C3F5F10:
+  category: bloatware
+  publisher: Microsoft
+  purpose: Cortana app package
+  recommendation: REMOVE
+  safety_rating: SAFE
+  notes: Legacy assistant, superseded by Copilot
+
+Microsoft.BingWeather:
+  category: bloatware
+  publisher: Microsoft
+  purpose: Weather app
+  recommendation: REMOVE
+  safety_rating: SAFE
+  notes: Remove if not used
+
+Microsoft.BingNews:
+  category: bloatware
+  publisher: Microsoft
+  purpose: News app
+  recommendation: REMOVE
+  safety_rating: SAFE
+  notes: Remove if not used
+
+Microsoft.GetHelp:
+  category: bloatware
+  publisher: Microsoft
+  purpose: Get Help app
+  recommendation: REMOVE
+  safety_rating: SAFE
+  notes: Rarely used, can reinstall from Store
+
+Microsoft.Getstarted:
+  category: bloatware
+  publisher: Microsoft
+  purpose: Tips app
+  recommendation: REMOVE
+  safety_rating: SAFE
+  notes: Shows tips and suggestions
+
+Microsoft.MicrosoftOfficeHub:
+  category: bloatware
+  publisher: Microsoft
+  purpose: Office hub/promotion app
+  recommendation: REMOVE
+  safety_rating: SAFE
+  notes: Just a launcher for Office products
+
+Microsoft.MicrosoftSolitaireCollection:
+  category: bloatware
+  publisher: Microsoft
+  purpose: Solitaire games with ads
+  recommendation: REMOVE
+  safety_rating: SAFE
+  notes: Contains ads
+
+Microsoft.People:
+  category: bloatware
+  publisher: Microsoft
+  purpose: People/contacts app
+  recommendation: REMOVE
+  safety_rating: SAFE
+  notes: Remove if not used
+
+Microsoft.SkypeApp:
+  category: bloatware
+  publisher: Microsoft
+  purpose: Skype app
+  recommendation: REMOVE
+  safety_rating: SAFE
+  notes: Remove if not used
+
+Microsoft.WindowsFeedbackHub:
+  category: bloatware
+  publisher: Microsoft
+  purpose: Feedback Hub
+  recommendation: REMOVE
+  safety_rating: SAFE
+  notes: Only needed to send feedback to Microsoft
+
+Microsoft.WindowsMaps:
+  category: bloatware
+  publisher: Microsoft
+  purpose: Maps app
+  recommendation: REMOVE
+  safety_rating: SAFE
+  notes: Remove if not used
+
+Microsoft.Xbox.TCUI:
+  category: bloatware
+  publisher: Microsoft
+  purpose: Xbox text/voice communication UI
+  recommendation: REMOVE
+  safety_rating: SAFE
+  notes: Part of Xbox ecosystem
+
+Microsoft.XboxGameOverlay:
+  category: bloatware
+  publisher: Microsoft
+  purpose: Xbox Game Bar overlay
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Can be disabled, some games may expect it
+
+Microsoft.XboxGamingOverlay:
+  category: bloatware
+  publisher: Microsoft
+  purpose: Xbox gaming overlay
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Part of Game Bar
+
+Microsoft.XboxIdentityProvider:
+  category: system
+  publisher: Microsoft
+  purpose: Xbox identity authentication
+  recommendation: KEEP
+  safety_rating: CAUTION
+  notes: Keep if you use Xbox/Microsoft Store games
+
+Microsoft.XboxSpeechToTextOverlay:
+  category: bloatware
+  publisher: Microsoft
+  purpose: Xbox speech to text
+  recommendation: REMOVE
+  safety_rating: SAFE
+  notes: Accessibility feature for Xbox
+
+Microsoft.ZuneMusic:
+  category: bloatware
+  publisher: Microsoft
+  purpose: Groove Music (now Media Player)
+  recommendation: REMOVE
+  safety_rating: SAFE
+  notes: Remove if using other music player
+
+Microsoft.ZuneVideo:
+  category: bloatware
+  publisher: Microsoft
+  purpose: Movies & TV app
+  recommendation: REMOVE
+  safety_rating: SAFE
+  notes: Remove if not used
+
+Clipchamp.Clipchamp:
+  category: bloatware
+  publisher: Microsoft
+  purpose: Video editor
+  recommendation: REMOVE
+  safety_rating: SAFE
+  notes: Remove if not used
+
+Microsoft.Todos:
+  category: bloatware
+  publisher: Microsoft
+  purpose: Microsoft To Do app
+  recommendation: REMOVE
+  safety_rating: SAFE
+  notes: Remove if not used
+
+MicrosoftTeams:
+  category: bloatware
+  publisher: Microsoft
+  purpose: Microsoft Teams chat/meetings
+  recommendation: REMOVE
+  safety_rating: SAFE
+  notes: Remove if not used for work

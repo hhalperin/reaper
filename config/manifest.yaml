@@ -1,0 +1,374 @@
+# Windows Optimization Toolkit - Master Manifest
+# This file defines what to keep, disable, or remove
+
+version: "1.0"
+created_at: "2026-01-19"
+last_updated: "2026-01-19"
+aggressiveness_level: light  # light | moderate | aggressive
+
+# =============================================================================
+# CRITICAL KEEP LIST - These are NEVER touched regardless of settings
+# =============================================================================
+critical_keep_list:
+  processes:
+    - "System"
+    - "csrss.exe"
+    - "wininit.exe"
+    - "services.exe"
+    - "lsass.exe"
+    - "svchost.exe"
+    - "dwm.exe"
+    - "explorer.exe"
+    - "winlogon.exe"
+    - "smss.exe"
+    - "fontdrvhost.exe"
+    - "conhost.exe"
+    - "RuntimeBroker.exe"
+    - "sihost.exe"
+    - "taskhostw.exe"
+    
+  services:
+    - "Dhcp"
+    - "Dnscache"
+    - "LanmanServer"
+    - "LanmanWorkstation"
+    - "RpcSs"
+    - "RpcEptMapper"
+    - "DcomLaunch"
+    - "LSM"
+    - "SamSs"
+    - "Schedule"
+    - "SENS"
+    - "EventLog"
+    - "PlugPlay"
+    - "Power"
+    - "ProfSvc"
+    - "Themes"
+    - "AudioEndpointBuilder"
+    - "Audiosrv"
+    - "WinDefend"
+    - "SecurityHealthService"
+    - "mpssvc"  # Windows Firewall
+    - "BFE"    # Base Filtering Engine
+    - "Wcmsvc" # Windows Connection Manager
+    - "NlaSvc" # Network Location Awareness
+    - "nsi"    # Network Store Interface
+    - "Netman" # Network Connections
+    - "W32Time"
+    - "EventSystem"
+    - "SystemEventsBroker"
+    - "TimeBrokerSvc"
+    - "TokenBroker"
+    - "UserManager"
+    - "Winmgmt"  # WMI
+
+# =============================================================================
+# ACTIONS BY CATEGORY
+# =============================================================================
+
+categories:
+  # ---------------------------------------------------------------------------
+  # AI FEATURES
+  # ---------------------------------------------------------------------------
+  ai_features:
+    description: "Microsoft AI features like Copilot and Recall"
+    level: moderate  # Only applied at moderate or higher
+    
+    copilot:
+      action: REMOVE
+      description: "Windows Copilot AI assistant"
+      methods:
+        - type: registry
+          path: "HKCU:\\Software\\Policies\\Microsoft\\Windows\\WindowsCopilot"
+          name: "TurnOffWindowsCopilot"
+          value: 1
+          value_type: "DWord"
+        - type: registry
+          path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsCopilot"
+          name: "TurnOffWindowsCopilot"
+          value: 1
+          value_type: "DWord"
+        - type: appx_remove
+          packages:
+            - "Microsoft.Windows.Copilot"
+            - "Microsoft.Copilot"
+        - type: taskbar_hide
+          name: "Copilot"
+          
+    recall:
+      action: DISABLE
+      description: "Windows Recall AI feature"
+      methods:
+        - type: registry
+          path: "HKCU:\\Software\\Policies\\Microsoft\\Windows\\WindowsAI"
+          name: "DisableAIDataAnalysis"
+          value: 1
+          value_type: "DWord"
+
+  # ---------------------------------------------------------------------------
+  # TELEMETRY
+  # ---------------------------------------------------------------------------
+  telemetry:
+    description: "Diagnostic and telemetry services"
+    level: light  # Applied at all levels
+    
+    diagnostic_tracking:
+      action: DISABLE
+      description: "Connected User Experiences and Telemetry"
+      methods:
+        - type: service
+          name: "DiagTrack"
+          startup_type: "Disabled"
+          
+    compatibility_telemetry:
+      action: DISABLE
+      description: "Microsoft Compatibility Telemetry"
+      methods:
+        - type: scheduled_task
+          path: "\\Microsoft\\Windows\\Application Experience"
+          name: "Microsoft Compatibility Appraiser"
+          action: "Disable"
+        - type: scheduled_task
+          path: "\\Microsoft\\Windows\\Application Experience"
+          name: "ProgramDataUpdater"
+          action: "Disable"
+          
+    wap_push:
+      action: DISABLE
+      description: "WAP Push Message Routing Service"
+      methods:
+        - type: service
+          name: "dmwappushservice"
+          startup_type: "Disabled"
+
+    advertising_id:
+      action: DISABLE
+      description: "Advertising ID for personalized ads"
+      methods:
+        - type: registry
+          path: "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\AdvertisingInfo"
+          name: "Enabled"
+          value: 0
+          value_type: "DWord"
+
+  # ---------------------------------------------------------------------------
+  # RGB SOFTWARE
+  # ---------------------------------------------------------------------------
+  rgb_software:
+    description: "RGB lighting control software"
+    level: light  # Applied at all levels
+    
+    razer_chroma:
+      action: DISABLE
+      description: "Razer Chroma SDK and related services"
+      methods:
+        - type: service
+          name: "Razer Chroma SDK Service"
+          startup_type: "Manual"
+        - type: service
+          name: "Razer Chroma SDK Server"
+          startup_type: "Manual"
+        - type: startup
+          name: "Razer Synapse"
+          action: "Disable"
+          
+    corsair_icue:
+      action: DISABLE
+      description: "Corsair iCUE software"
+      methods:
+        - type: service
+          name: "CorsairGamingAudioConfig"
+          startup_type: "Manual"
+        - type: service
+          name: "CorsairLLAService"
+          startup_type: "Manual"
+        - type: startup
+          name: "Corsair.Service"
+          action: "Disable"
+
+  # ---------------------------------------------------------------------------
+  # WINDOWS BLOATWARE
+  # ---------------------------------------------------------------------------
+  bloatware:
+    description: "Pre-installed Windows apps that are rarely used"
+    level: moderate
+    
+    cortana:
+      action: REMOVE
+      description: "Cortana assistant (legacy)"
+      methods:
+        - type: appx_remove
+          packages:
+            - "Microsoft.549981C3F5F10"
+            
+    xbox_components:
+      action: DISABLE
+      description: "Xbox-related components (keep if gaming)"
+      methods:
+        - type: service
+          name: "XblAuthManager"
+          startup_type: "Manual"
+        - type: service
+          name: "XblGameSave"
+          startup_type: "Manual"
+        - type: service
+          name: "XboxGipSvc"
+          startup_type: "Manual"
+        - type: service
+          name: "XboxNetApiSvc"
+          startup_type: "Manual"
+          
+    phone_link:
+      action: REMOVE
+      description: "Phone Link (Your Phone) app"
+      methods:
+        - type: appx_remove
+          packages:
+            - "Microsoft.YourPhone"
+            
+    feedback_hub:
+      action: REMOVE
+      description: "Windows Feedback Hub"
+      methods:
+        - type: appx_remove
+          packages:
+            - "Microsoft.WindowsFeedbackHub"
+            
+    get_help:
+      action: REMOVE
+      description: "Get Help app"
+      methods:
+        - type: appx_remove
+          packages:
+            - "Microsoft.GetHelp"
+            
+    tips:
+      action: REMOVE
+      description: "Tips app"
+      methods:
+        - type: appx_remove
+          packages:
+            - "Microsoft.Getstarted"
+
+  # ---------------------------------------------------------------------------
+  # ADS AND SUGGESTIONS
+  # ---------------------------------------------------------------------------
+  ads_suggestions:
+    description: "Windows ads, suggestions, and promotional content"
+    level: light
+    
+    start_menu_suggestions:
+      action: DISABLE
+      description: "Suggested apps in Start menu"
+      methods:
+        - type: registry
+          path: "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager"
+          name: "SubscribedContent-338388Enabled"
+          value: 0
+          value_type: "DWord"
+        - type: registry
+          path: "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager"
+          name: "SubscribedContent-338389Enabled"
+          value: 0
+          value_type: "DWord"
+        - type: registry
+          path: "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager"
+          name: "SubscribedContent-353694Enabled"
+          value: 0
+          value_type: "DWord"
+        - type: registry
+          path: "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager"
+          name: "SubscribedContent-353696Enabled"
+          value: 0
+          value_type: "DWord"
+          
+    lock_screen_tips:
+      action: DISABLE
+      description: "Tips on lock screen"
+      methods:
+        - type: registry
+          path: "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager"
+          name: "RotatingLockScreenOverlayEnabled"
+          value: 0
+          value_type: "DWord"
+        - type: registry
+          path: "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager"
+          name: "SubscribedContent-338387Enabled"
+          value: 0
+          value_type: "DWord"
+          
+    windows_tips:
+      action: DISABLE
+      description: "Windows tips and suggestions"
+      methods:
+        - type: registry
+          path: "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager"
+          name: "SoftLandingEnabled"
+          value: 0
+          value_type: "DWord"
+          
+    settings_suggestions:
+      action: DISABLE
+      description: "Suggestions in Settings app"
+      methods:
+        - type: registry
+          path: "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager"
+          name: "SubscribedContent-338393Enabled"
+          value: 0
+          value_type: "DWord"
+        - type: registry
+          path: "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager"
+          name: "SubscribedContent-353698Enabled"
+          value: 0
+          value_type: "DWord"
+
+  # ---------------------------------------------------------------------------
+  # OPTIONAL SERVICES (Aggressive level)
+  # ---------------------------------------------------------------------------
+  optional_services:
+    description: "Services that can be disabled if features not used"
+    level: aggressive
+    
+    print_spooler:
+      action: DISABLE
+      description: "Print Spooler (disable if no printers)"
+      condition: "no_printers"
+      methods:
+        - type: service
+          name: "Spooler"
+          startup_type: "Manual"
+          
+    bluetooth:
+      action: DISABLE
+      description: "Bluetooth services (disable if not used)"
+      condition: "no_bluetooth"
+      methods:
+        - type: service
+          name: "bthserv"
+          startup_type: "Manual"
+        - type: service
+          name: "BluetoothUserService"
+          startup_type: "Manual"
+          
+    fax:
+      action: DISABLE
+      description: "Fax service"
+      methods:
+        - type: service
+          name: "Fax"
+          startup_type: "Disabled"
+
+# =============================================================================
+# USER OVERRIDES
+# This section allows you to override default recommendations
+# =============================================================================
+overrides:
+  # Example: Keep Xbox services because you use Game Pass
+  # xbox_components:
+  #   action: KEEP
+  #   reason: "Using Xbox Game Pass"
+  
+  # Example: Keep Razer Synapse because you need macros
+  # razer_chroma:
+  #   action: KEEP
+  #   reason: "Need macros for productivity"
