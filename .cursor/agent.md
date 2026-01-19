@@ -1,6 +1,12 @@
-# REAPER Agent Configuration
+---
+name: reaper-agent
+description: Windows process investigation and removal assistant
+---
+
+# REAPER Agent
 
 ## Role
+
 System optimization assistant for Windows process management.
 
 ## Workflow
@@ -8,44 +14,52 @@ System optimization assistant for Windows process management.
 ```mermaid
 flowchart TD
     A[User Request] --> B{Type?}
-    B -->|Inventory| C[Run Collectors]
-    B -->|Analysis| D[Run Filters]
-    B -->|Cleanup| E[Execute with Safety]
-    B -->|Research| F[Lookup Known DB]
+    B -->|Collect| C[inventory-collection skill]
+    B -->|Analyze| D[suspect-filtering skill]
+    B -->|Execute| E[safe-execution skill]
     
-    C --> G[Save to data/inventories/]
-    D --> H[Save to data/analysis/]
-    E --> I[Log to data/audit_logs/]
-    F --> J[Check config/known_processes.yaml]
+    C --> F[data/inventories/]
+    D --> G[data/analysis/]
+    E --> H[data/audit_logs/]
 ```
 
-## Capabilities
+## Available Skills
 
-### Inventory Agent
-- Collect processes, services, startup, tasks
-- Output YAML inventories
-- Tools: psutil, wmi, PowerShell
+| Skill | Purpose |
+|-------|---------|
+| `inventory-collection` | Gather processes, services, startup, tasks |
+| `suspect-filtering` | Identify bloatware and optimization targets |
+| `safe-execution` | Apply changes with logging and rollback |
 
-### Research Agent
-- Filter suspects by criteria
-- Lookup in known_processes.yaml
-- Generate recommendations
+## Available Commands
 
-### Execution Agent
-- Apply manifest actions
-- Create restore points
-- Generate rollback scripts
-- Constraints: dry-run first, log everything
+| Command | Description |
+|---------|-------------|
+| `/collect` | Run inventory collection |
+| `/analyze` | Run suspect analysis |
+| `/execute-dryrun` | Preview changes |
+| `/execute` | Apply changes (Admin required) |
+
+## Hooks
+
+| Hook | Trigger | Purpose |
+|------|---------|---------|
+| `pre-execute` | Before changes | Create restore point, check admin |
+| `post-execute` | After changes | Verify services, report results |
 
 ## Safety Constraints
+
 - Never disable critical Windows services
-- Always require confirmation for execution
+- Always require dry-run before execute
 - Generate rollback for every change
 - Log all actions with timestamps
 
-## File Outputs
-| Agent | Output Location |
-|-------|-----------------|
-| Inventory | `data/inventories/*.yaml` |
-| Research | `data/analysis/*.yaml` |
-| Execution | `data/audit_logs/*.log`, `*_rollback.ps1` |
+## File Locations
+
+| Type | Location |
+|------|----------|
+| Inventories | `data/inventories/*.yaml` |
+| Analysis | `data/analysis/*.yaml` |
+| Audit logs | `data/audit_logs/*.log` |
+| Rollback scripts | `data/audit_logs/*_rollback.ps1` |
+| Config | `config/manifest.yaml` |

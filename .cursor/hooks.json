@@ -1,0 +1,16 @@
+{
+  "hooks": [
+    {
+      "name": "pre-execute",
+      "trigger": "before",
+      "script": ".cursor/hooks/pre-execute.ps1",
+      "description": "Validates admin rights, creates restore point before changes"
+    },
+    {
+      "name": "post-execute", 
+      "trigger": "after",
+      "script": ".cursor/hooks/post-execute.ps1",
+      "description": "Verifies critical services, reports change count"
+    }
+  ]
+}
