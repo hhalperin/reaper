@@ -412,8 +412,8 @@ $regKeys = @(
     @{Path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\System"; Name="PublishUserActivities"; Value=0; Desc="SPYWARE: Publish activities"}
     @{Path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\System"; Name="UploadUserActivities"; Value=0; Desc="SPYWARE: Upload activities to Microsoft"}
     
-    # Location tracking
-    @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location"; Name="Value"; Value="Deny"; Desc="SPYWARE: Location tracking"}
+    # Location tracking - uses string value
+    # Note: Location is handled separately as it uses a string value
     
     # App telemetry
     @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"; Name="Start_TrackProgs"; Value=0; Desc="SPYWARE: Track app usage"}
