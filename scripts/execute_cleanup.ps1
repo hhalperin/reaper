@@ -320,9 +320,9 @@ $services = @(
     @{Name="dmwappushservice"; Reason="SPYWARE: WAP push messages"}
     @{Name="WMPNetworkSvc"; Reason="SPYWARE: Media Player network sharing"}
     @{Name="WerSvc"; Reason="SPYWARE: Windows Error Reporting - sends crash data to Microsoft"}
-    @{Name="CDPUserSvc"; Reason="SPYWARE: Connected Devices - syncs activity across devices"}
+    # NOTE: CDPUserSvc removed - breaks Night Light feature
+    # NOTE: SSDPSRV removed - needed for network printer/device discovery
     @{Name="PcaSvc"; Reason="SPYWARE: Program Compatibility Assistant - telemetry"}
-    @{Name="SSDPSRV"; Reason="SPYWARE: SSDP Discovery - can be used for network profiling"}
     @{Name="XblAuthManager"; Reason="Xbox - not used by Steam/Epic games"}
     @{Name="XblGameSave"; Reason="Xbox cloud saves - Steam has its own"}
     @{Name="XboxGipSvc"; Reason="Xbox accessories - standard gamepads work without"}
