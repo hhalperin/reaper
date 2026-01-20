@@ -441,3 +441,251 @@ MicrosoftTeams:
   recommendation: REMOVE
   safety_rating: SAFE
   notes: Remove if not used for work
+
+# =============================================================================
+# HARDWARE VENDOR SERVICES - Usually keep but can set to manual
+# =============================================================================
+
+ArmouryCrateService:
+  category: utility
+  publisher: ASUS
+  purpose: ASUS ROG/TUF hardware control and RGB
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Fan control, RGB, performance profiles. Devices work without it.
+
+asComSvc:
+  category: utility
+  publisher: ASUS
+  purpose: ASUS COM Service
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Background service for ASUS software
+
+AsusCertService:
+  category: utility
+  publisher: ASUS
+  purpose: ASUS certificate service
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: For ASUS software updates
+
+AsusFanControlService:
+  category: utility
+  publisher: ASUS
+  purpose: ASUS fan control
+  recommendation: KEEP
+  safety_rating: CAUTION
+  notes: Keep if you need custom fan curves, otherwise disable
+
+AUEPLauncher:
+  category: utility
+  publisher: ASUS
+  purpose: ASUS utility launcher
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Launcher for ASUS utilities
+
+Apple Mobile Device Service:
+  category: utility
+  publisher: Apple
+  purpose: iTunes/Apple device sync
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Only needed when syncing Apple devices
+
+Bonjour Service:
+  category: utility
+  publisher: Apple
+  purpose: Zero-configuration networking
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: mDNS service, used by iTunes and some apps
+
+chromoting:
+  category: utility
+  publisher: Google
+  purpose: Chrome Remote Desktop
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Set to manual if not using remote desktop
+
+ClickToRunSvc:
+  category: system
+  publisher: Microsoft
+  purpose: Microsoft Office Click-to-Run
+  recommendation: KEEP
+  safety_rating: CAUTION
+  notes: Required for Office updates and repair
+
+# =============================================================================
+# UPDATER SERVICES - Safe to disable
+# =============================================================================
+
+GoogleUpdaterService:
+  category: utility
+  publisher: Google
+  purpose: Google software update service
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Chrome updates via browser anyway
+
+GoogleUpdaterInternalService:
+  category: utility
+  publisher: Google
+  purpose: Internal Google updater
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Companion to GoogleUpdaterService
+
+edgeupdate:
+  category: utility
+  publisher: Microsoft
+  purpose: Microsoft Edge update service
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Edge still updates via Windows Update
+
+edgeupdatem:
+  category: utility
+  publisher: Microsoft
+  purpose: Microsoft Edge update service (machine-wide)
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Companion to edgeupdate
+
+brave:
+  category: utility
+  publisher: Brave Software
+  purpose: Brave browser update service
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Browser updates when launched anyway
+
+EpicGamesUpdater:
+  category: utility
+  publisher: Epic Games
+  purpose: Epic Games Launcher update service
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Launcher updates when opened
+
+EpicOnlineServices:
+  category: utility
+  publisher: Epic Games
+  purpose: Epic Online Services background
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: For Epic multiplayer, set to manual
+
+FileSyncHelper:
+  category: utility
+  publisher: Microsoft
+  purpose: OneDrive file sync helper
+  recommendation: KEEP
+  safety_rating: CAUTION
+  notes: Keep if using OneDrive
+
+OneDrive Updater Service:
+  category: utility
+  publisher: Microsoft
+  purpose: OneDrive update service
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: OneDrive updates via app
+
+# =============================================================================
+# GAME LAUNCHERS - Keep or set to manual
+# =============================================================================
+
+Steam:
+  category: utility
+  publisher: Valve
+  purpose: Steam gaming platform
+  recommendation: KEEP
+  safety_rating: SAFE
+  notes: Keep if you use Steam, disable auto-start if not gaming
+
+Discord:
+  category: utility
+  publisher: Discord Inc.
+  purpose: Chat and voice communication
+  recommendation: KEEP
+  safety_rating: SAFE
+  notes: Disable auto-start if not always needed
+
+EpicGamesLauncher:
+  category: utility
+  publisher: Epic Games
+  purpose: Epic Games store and launcher
+  recommendation: KEEP
+  safety_rating: SAFE
+  notes: Disable auto-start
+
+# =============================================================================
+# KNOWN SAFE - Common apps that get false-flagged
+# =============================================================================
+
+Cursor.exe:
+  category: utility
+  publisher: Cursor Inc.
+  purpose: AI-powered code editor
+  recommendation: KEEP
+  safety_rating: SAFE
+  notes: Development tool, signature may not be detected
+
+chrome.exe:
+  category: utility
+  publisher: Google
+  purpose: Google Chrome browser
+  recommendation: KEEP
+  safety_rating: SAFE
+  notes: Web browser
+
+node.exe:
+  category: utility
+  publisher: OpenJS Foundation
+  purpose: Node.js JavaScript runtime
+  recommendation: KEEP
+  safety_rating: SAFE
+  notes: Development runtime
+
+Obsidian.exe:
+  category: utility
+  publisher: Obsidian
+  purpose: Note-taking and knowledge base
+  recommendation: KEEP
+  safety_rating: SAFE
+  notes: Personal knowledge management
+
+powershell.exe:
+  category: system
+  publisher: Microsoft
+  purpose: PowerShell command shell
+  recommendation: KEEP
+  safety_rating: SAFE
+  notes: Windows automation and scripting
+
+MemCompression:
+  category: system
+  publisher: Microsoft
+  purpose: Memory compression process
+  recommendation: KEEP
+  safety_rating: CRITICAL
+  notes: Windows memory management, high memory is normal
+
+SystemSettings.exe:
+  category: system
+  publisher: Microsoft
+  purpose: Windows Settings app
+  recommendation: KEEP
+  safety_rating: SAFE
+  notes: Windows configuration
+
+Taskmgr.exe:
+  category: system
+  publisher: Microsoft
+  purpose: Windows Task Manager
+  recommendation: KEEP
+  safety_rating: SAFE
+  notes: System monitoring tool

@@ -1,0 +1,47 @@
+# Service Display Name to Service Name mapping
+# PowerShell: Get-Service | Select Name, DisplayName
+
+# Format:
+# "Display Name": "ServiceName"
+
+"Apple Mobile Device Service": "Apple Mobile Device Service"
+"ASUS COM Service": "asComSvc"
+"ASUS Certificate Service": "AsusCertService"
+"ASUS Fan Control Service": "AsusFanControlService"
+"ASUS Software Manager": "asus"
+"Armoury Crate Control Interface": "ArmouryCrateControlInterface"
+"Armoury Crate Service": "ArmouryCrateService"
+"AURA LED Controller Service": "AUEPLauncher"
+
+"Bonjour Service": "Bonjour Service"
+"Brave Update Service": "brave"
+
+"Chrome Remote Desktop Service": "chromoting"
+"Microsoft Office Click-to-Run Service": "ClickToRunSvc"
+"Cortex Launcher Service": "CortexLauncherService"
+
+"Connected User Experiences and Telemetry": "DiagTrack"
+"Device Management Wireless Application Protocol (WAP) Push message Routing Service": "dmwappushservice"
+
+"Microsoft Edge Update Service": "edgeupdate"
+"Microsoft Edge Update Service (edgeupdatem)": "edgeupdatem"
+"Epic Games Updater": "EpicGamesUpdater"
+"Epic Online Services": "EpicOnlineServices"
+
+"OneDrive File Sync Helper": "FileSyncHelper"
+"Google Update Service": "gupdate"
+"Logitech G HUB Updater Service": "LGHUBUpdaterService"
+"Logitech Options+ Updater Service": "OptionsPlusUpdaterService"
+
+"OneDrive Updater Service": "OneDrive Updater Service"
+
+"Razer Chroma SDK Server": "Razer Chroma SDK Server"
+"Razer Chroma SDK Service": "Razer Chroma SDK Service"
+"Razer Chroma Stream Server": "Razer Chroma Stream Server"
+"Razer Game Manager Service": "Razer Game Manager Service"
+"Razer Synapse Service": "Razer Synapse Service"
+
+"Xbox Accessory Management Service": "XboxGipSvc"
+"Xbox Live Auth Manager": "XblAuthManager"
+"Xbox Live Game Save": "XblGameSave"
+"Xbox Live Networking Service": "XboxNetApiSvc"
