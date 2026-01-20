@@ -40,3 +40,6 @@ desktop.ini
 *.bak
 *.backup
 *.reg.backup
+
+# MCP config (contains tokens)
+.cursor/mcp.json

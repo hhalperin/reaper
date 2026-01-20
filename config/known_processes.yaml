@@ -689,3 +689,239 @@ Taskmgr.exe:
   recommendation: KEEP
   safety_rating: SAFE
   notes: System monitoring tool
+
+# =============================================================================
+# RAZER SERVICES - Safe to disable
+# =============================================================================
+
+CortexLauncherService:
+  category: utility
+  publisher: Razer Inc.
+  purpose: Razer Cortex game booster launcher
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Game optimization tool, not essential
+
+"Razer Chroma SDK Server":
+  category: utility
+  publisher: Razer Inc.
+  purpose: Razer Chroma RGB server
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: RGB synchronization server
+
+"Razer Chroma SDK Service":
+  category: utility
+  publisher: Razer Inc.
+  purpose: Razer Chroma RGB service
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: RGB synchronization service
+
+"Razer Chroma Stream Server":
+  category: utility
+  publisher: Razer Inc.
+  purpose: Razer Chroma streaming
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: For streaming RGB effects
+
+"Razer Elevation Service":
+  category: utility
+  publisher: Razer Inc.
+  purpose: Razer elevated operations
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Admin operations for Razer software
+
+"Razer Game Manager Service 3":
+  category: utility
+  publisher: Razer Inc.
+  purpose: Razer game detection and profiles
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Auto-detects games for profiles
+
+RzActionSvc:
+  category: utility
+  publisher: Razer Inc.
+  purpose: Razer action service
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Macro and action handling
+
+RazerAxon:
+  category: utility
+  publisher: Razer Inc.
+  purpose: Razer Axon wallpaper engine
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Dynamic wallpapers, resource heavy
+
+RazerAppEngine:
+  category: utility
+  publisher: Razer Inc.
+  purpose: Razer app engine for Chroma
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Chroma app integration
+
+# =============================================================================
+# ASUS/ROG SERVICES - Safe to disable (except fan control)
+# =============================================================================
+
+asus:
+  category: utility
+  publisher: ASUS
+  purpose: ASUS software manager service
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Background ASUS software management
+
+"ROG Live Service":
+  category: utility
+  publisher: ASUS
+  purpose: ROG Live service for ASUS ROG
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: ROG features and updates
+
+CMigrationService:
+  category: utility
+  publisher: Unknown
+  purpose: Migration service
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Data migration, rarely needed
+
+# =============================================================================
+# XBOX SERVICES - Set to manual for gaming
+# =============================================================================
+
+XblAuthManager:
+  category: system
+  publisher: Microsoft
+  purpose: Xbox Live authentication
+  recommendation: KEEP
+  safety_rating: CAUTION
+  notes: Keep if using Xbox/Game Pass, set to manual
+
+XblGameSave:
+  category: system
+  publisher: Microsoft
+  purpose: Xbox Live cloud saves
+  recommendation: KEEP
+  safety_rating: CAUTION
+  notes: Keep for cloud game saves
+
+XboxGipSvc:
+  category: system
+  publisher: Microsoft
+  purpose: Xbox controller support
+  recommendation: KEEP
+  safety_rating: CAUTION
+  notes: Keep for Xbox controllers
+
+XboxNetApiSvc:
+  category: system
+  publisher: Microsoft
+  purpose: Xbox Live networking
+  recommendation: KEEP
+  safety_rating: CAUTION
+  notes: Keep for Xbox multiplayer
+
+# =============================================================================
+# SYSTEM SERVICES - Keep
+# =============================================================================
+
+WSLService:
+  category: system
+  publisher: Microsoft
+  purpose: Windows Subsystem for Linux
+  recommendation: KEEP
+  safety_rating: SAFE
+  notes: Keep if using WSL/Linux
+
+"Steam Client Service":
+  category: utility
+  publisher: Valve
+  purpose: Steam client background service
+  recommendation: KEEP
+  safety_rating: SAFE
+  notes: Required for Steam
+
+# =============================================================================
+# STARTUP ITEMS - Various
+# =============================================================================
+
+SecurityHealth:
+  category: security
+  publisher: Microsoft
+  purpose: Windows Security startup
+  recommendation: KEEP
+  safety_rating: CRITICAL
+  notes: Windows Defender tray icon
+
+"Adobe Creative Cloud":
+  category: utility
+  publisher: Adobe
+  purpose: Adobe CC background service
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Disable if not using Adobe apps constantly
+
+iTunesHelper:
+  category: utility
+  publisher: Apple
+  purpose: iTunes device detection
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Only needed when connecting Apple devices
+
+"Docker Desktop":
+  category: utility
+  publisher: Docker Inc.
+  purpose: Docker container platform
+  recommendation: KEEP
+  safety_rating: SAFE
+  notes: Keep if using Docker, disable auto-start otherwise
+
+HPDisplayCenter:
+  category: utility
+  publisher: HP
+  purpose: HP display management
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Monitor settings, rarely needed at startup
+
+RtkAudUService:
+  category: driver
+  publisher: Realtek
+  purpose: Realtek audio service
+  recommendation: KEEP
+  safety_rating: CAUTION
+  notes: Audio driver service
+
+AMDNoiseSuppression:
+  category: utility
+  publisher: AMD
+  purpose: AMD noise suppression for audio
+  recommendation: KEEP
+  safety_rating: SAFE
+  notes: Audio enhancement, keep if using
+
+PrintScreenToSnip:
+  category: system
+  publisher: Microsoft
+  purpose: Snipping Tool shortcut
+  recommendation: KEEP
+  safety_rating: SAFE
+  notes: Maps PrintScreen to Snipping Tool
+
+TeamsMachineUninstallerLocalAppData:
+  category: bloatware
+  publisher: Microsoft
+  purpose: Teams uninstaller cleanup
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: Cleanup task for Teams
