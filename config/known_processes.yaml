@@ -473,10 +473,14 @@ AsusCertService:
 AsusFanControlService:
   category: utility
   publisher: ASUS
-  purpose: ASUS fan control
-  recommendation: KEEP
+  purpose: ASUS fan control for custom curves
+  recommendation: DISABLE
   safety_rating: CAUTION
-  notes: Keep if you need custom fan curves, otherwise disable
+  notes: |
+    ONLY keep if you set custom fan curves in Armoury Crate.
+    If using BIOS default fan curves, this is unnecessary.
+    Fans work via BIOS without this service.
+    Impact: Lose Armoury Crate custom fan profiles.
 
 AUEPLauncher:
   category: utility
@@ -511,12 +515,16 @@ chromoting:
   notes: Set to manual if not using remote desktop
 
 ClickToRunSvc:
-  category: system
+  category: utility
   publisher: Microsoft
-  purpose: Microsoft Office Click-to-Run
-  recommendation: KEEP
-  safety_rating: CAUTION
-  notes: Required for Office updates and repair
+  purpose: Microsoft Office Click-to-Run service
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: |
+    Office apps start this ON-DEMAND when needed.
+    Does NOT need to run constantly.
+    Impact: Office apps launch 1-2 seconds slower first time.
+    Updates still work when you open an Office app.
 
 # =============================================================================
 # UPDATER SERVICES - Safe to disable
@@ -582,9 +590,12 @@ FileSyncHelper:
   category: utility
   publisher: Microsoft
   purpose: OneDrive file sync helper
-  recommendation: KEEP
-  safety_rating: CAUTION
-  notes: Keep if using OneDrive
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: |
+    Only keep if actively using OneDrive sync.
+    If you just have OneDrive installed but don't sync, disable.
+    Impact: OneDrive files won't sync in background.
 
 OneDrive Updater Service:
   category: utility
@@ -795,43 +806,56 @@ CMigrationService:
   notes: Data migration, rarely needed
 
 # =============================================================================
-# XBOX SERVICES - Set to manual for gaming
+# XBOX SERVICES - DISABLE (only needed for Game Pass/MS Store games)
+# Steam, Epic, GOG games do NOT use these services
 # =============================================================================
 
 XblAuthManager:
-  category: system
+  category: bloatware
   publisher: Microsoft
-  purpose: Xbox Live authentication
-  recommendation: KEEP
-  safety_rating: CAUTION
-  notes: Keep if using Xbox/Game Pass, set to manual
+  purpose: Xbox Live authentication - ONLY for Microsoft Store/Game Pass games
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: |
+    Steam/Epic/GOG games work fine without this.
+    Only keep if you use Xbox Game Pass or Microsoft Store games.
+    Impact: Cannot sign into Xbox app or Game Pass.
 
 XblGameSave:
-  category: system
+  category: bloatware
   publisher: Microsoft
-  purpose: Xbox Live cloud saves
-  recommendation: KEEP
-  safety_rating: CAUTION
-  notes: Keep for cloud game saves
+  purpose: Xbox cloud saves - ONLY for Xbox Play Anywhere titles
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: |
+    Steam has its own cloud saves. Epic has its own.
+    This only syncs saves for Xbox ecosystem games.
+    Impact: Lose Xbox cloud saves (not Steam/Epic saves).
 
 XboxGipSvc:
-  category: system
+  category: bloatware
   publisher: Microsoft
-  purpose: Xbox controller support
-  recommendation: KEEP
-  safety_rating: CAUTION
-  notes: Keep for Xbox controllers
+  purpose: Xbox accessory management - controllers work without this
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: |
+    Standard XInput controllers work via Windows drivers.
+    Only needed for Xbox Wireless Adapter or specific Xbox headsets.
+    Impact: May lose Xbox Elite controller profile sync.
 
 XboxNetApiSvc:
-  category: system
+  category: bloatware
   publisher: Microsoft
-  purpose: Xbox Live networking
-  recommendation: KEEP
-  safety_rating: CAUTION
-  notes: Keep for Xbox multiplayer
+  purpose: Xbox Live networking - peer-to-peer for Xbox multiplayer
+  recommendation: DISABLE
+  safety_rating: SAFE
+  notes: |
+    Only used by Xbox Live multiplayer (Halo, Forza, etc).
+    Steam/Epic multiplayer uses different networking.
+    Impact: Cannot use Xbox Live party chat or multiplayer.
 
 # =============================================================================
-# SYSTEM SERVICES - Keep
+# CONDITIONAL SERVICES - Depends on your use case
 # =============================================================================
 
 WSLService:
@@ -840,15 +864,21 @@ WSLService:
   purpose: Windows Subsystem for Linux
   recommendation: KEEP
   safety_rating: SAFE
-  notes: Keep if using WSL/Linux
+  notes: |
+    Keep ONLY if you use WSL or Docker with WSL2 backend.
+    If not using Linux development, safe to disable.
+    Impact: Cannot start WSL distros or Docker containers.
 
 "Steam Client Service":
   category: utility
   publisher: Valve
-  purpose: Steam client background service
-  recommendation: KEEP
+  purpose: Steam background service for game installs/updates
+  recommendation: DISABLE
   safety_rating: SAFE
-  notes: Required for Steam
+  notes: |
+    Steam starts this ON-DEMAND when needed.
+    Does NOT need to run constantly.
+    Impact: Steam launches ~1 second slower. Games work normally.
 
 # =============================================================================
 # STARTUP ITEMS - Various
