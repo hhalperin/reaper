@@ -1,289 +1,277 @@
 <#
 .SYNOPSIS
-    Windows Optimization Toolkit - Cleanup Executor
+    REAPER - Windows Service Cleanup Executor
     
 .DESCRIPTION
-    Executes cleanup actions defined in the manifest.yaml file.
-    Supports dry-run mode to preview changes before applying.
-    Creates system restore point and generates rollback script.
+    Disables services and startup items with full audit logging and automatic rollback.
+    Creates restore point, logs all changes, generates undo script.
     
 .PARAMETER DryRun
-    Preview changes without making any modifications.
+    Preview changes without applying.
     
 .PARAMETER Execute
-    Apply changes (requires confirmation).
-    
-.PARAMETER ManifestPath
-    Path to manifest.yaml file. Defaults to config/manifest.yaml.
+    Apply changes (requires Admin).
     
 .PARAMETER Level
-    Aggressiveness level to apply (light, moderate, aggressive).
-    Overrides manifest setting.
+    Aggressiveness: light, moderate, aggressive
     
-.PARAMETER SkipRestorePoint
-    Skip creating system restore point (not recommended).
+.PARAMETER AutoRollbackOnError
+    Automatically undo all changes if any error occurs.
     
 .EXAMPLE
     .\execute_cleanup.ps1 -DryRun
-    
-.EXAMPLE
-    .\execute_cleanup.ps1 -Execute -Level light
-    
-.NOTES
-    Requires Administrator privileges for most operations.
+    .\execute_cleanup.ps1 -Execute -Level moderate
+    .\execute_cleanup.ps1 -Execute -AutoRollbackOnError
 #>
 
 param(
     [switch]$DryRun,
     [switch]$Execute,
-    [string]$ManifestPath = "config\manifest.yaml",
     [ValidateSet("light", "moderate", "aggressive")]
-    [string]$Level,
-    [switch]$SkipRestorePoint
+    [string]$Level = "moderate",
+    [switch]$SkipRestorePoint,
+    [switch]$AutoRollbackOnError
 )
 
-# Check for admin privileges
-$isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
 
-if (-not $isAdmin -and $Execute) {
-    Write-Host "ERROR: Administrator privileges required for execution mode." -ForegroundColor Red
-    Write-Host "Please run PowerShell as Administrator." -ForegroundColor Yellow
-    exit 1
-}
+$ErrorActionPreference = "Stop"
+$script:ErrorCount = 0
+$script:SuccessCount = 0
+$script:RollbackCommands = @()
 
-# Validate parameters
-if (-not $DryRun -and -not $Execute) {
-    Write-Host "ERROR: Specify either -DryRun or -Execute" -ForegroundColor Red
-    Write-Host ""
-    Write-Host "Usage:"
-    Write-Host "  .\execute_cleanup.ps1 -DryRun     # Preview changes"
-    Write-Host "  .\execute_cleanup.ps1 -Execute   # Apply changes"
-    exit 1
-}
-
-# Set up paths
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectRoot = Split-Path -Parent $scriptDir
-$manifestFullPath = Join-Path $projectRoot $ManifestPath
 $logsDir = Join-Path $projectRoot "data\audit_logs"
 $timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
 
-# Ensure logs directory exists
-if (-not (Test-Path $logsDir)) {
-    New-Item -ItemType Directory -Path $logsDir -Force | Out-Null
-}
+# Ensure logs directory
+if (-not (Test-Path $logsDir)) { New-Item -ItemType Directory -Path $logsDir -Force | Out-Null }
 
 $logFile = Join-Path $logsDir "${timestamp}_execution.log"
 $rollbackFile = Join-Path $logsDir "${timestamp}_rollback.ps1"
+$summaryFile = Join-Path $logsDir "${timestamp}_summary.txt"
 
-# Logging function
+# ============================================================================
+# LOGGING - Clean, structured output
+# ============================================================================
+
 function Write-Log {
-    param([string]$Message, [string]$Level = "INFO")
-    $logEntry = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [$Level] $Message"
-    Add-Content -Path $logFile -Value $logEntry
+    param(
+        [string]$Message,
+        [ValidateSet("INFO", "SUCCESS", "ERROR", "WARN", "DRYRUN", "HEADER")]
+        [string]$Level = "INFO"
+    )
+    
+    $ts = Get-Date -Format "HH:mm:ss"
+    $prefix = switch ($Level) {
+        "HEADER"  { "═══" }
+        "SUCCESS" { " ✓ " }
+        "ERROR"   { " ✗ " }
+        "WARN"    { " ⚠ " }
+        "DRYRUN"  { " → " }
+        default   { "   " }
+    }
     
     $color = switch ($Level) {
-        "ERROR" { "Red" }
-        "WARNING" { "Yellow" }
+        "HEADER"  { "Cyan" }
         "SUCCESS" { "Green" }
-        "DRYRUN" { "Cyan" }
-        default { "White" }
+        "ERROR"   { "Red" }
+        "WARN"    { "Yellow" }
+        "DRYRUN"  { "DarkCyan" }
+        default   { "Gray" }
     }
-    Write-Host $logEntry -ForegroundColor $color
+    
+    $logLine = "[$ts] $prefix $Message"
+    Add-Content -Path $logFile -Value $logLine
+    Write-Host $logLine -ForegroundColor $color
 }
 
-# Initialize rollback script
+function Write-Section {
+    param([string]$Title)
+    Write-Host ""
+    Write-Log "═══════════════════════════════════════════════════════" "HEADER"
+    Write-Log $Title "HEADER"
+    Write-Log "═══════════════════════════════════════════════════════" "HEADER"
+}
+
+# ============================================================================
+# ROLLBACK SYSTEM
+# ============================================================================
+
 function Initialize-Rollback {
     $header = @"
-# Windows Optimization Toolkit - Rollback Script
-# Session: $timestamp
+# REAPER Rollback Script
 # Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+# Session: $timestamp
 #
-# WARNING: This script reverses ALL changes from the session.
+# This script reverses ALL changes from the cleanup session.
 # Run as Administrator.
 
-`$confirm = Read-Host "This will rollback all changes. Continue? (y/N)"
-if (`$confirm -ne "y" -and `$confirm -ne "Y") {
-    Write-Host "Rollback cancelled."
-    exit
-}
+Set-StrictMode -Version Latest
+`$ErrorActionPreference = "Continue"
 
-Write-Host "Starting rollback..."
+Write-Host "REAPER Rollback - Restoring previous state..." -ForegroundColor Cyan
+Write-Host ""
 
 "@
     Set-Content -Path $rollbackFile -Value $header
 }
 
-# Add rollback command
-function Add-Rollback {
-    param([string]$Comment, [string]$Command)
-    Add-Content -Path $rollbackFile -Value "# $Comment"
-    Add-Content -Path $rollbackFile -Value $Command
-    Add-Content -Path $rollbackFile -Value ""
-}
-
-# Load manifest
-function Load-Manifest {
-    param([string]$Path)
+function Add-RollbackCommand {
+    param(
+        [string]$Description,
+        [string]$Command
+    )
     
-    if (-not (Test-Path $Path)) {
-        Write-Log "Manifest not found: $Path" "ERROR"
-        exit 1
+    $script:RollbackCommands += @{
+        Description = $Description
+        Command = $Command
     }
     
-    # Simple YAML parser for our structure
-    $content = Get-Content $Path -Raw
+    $block = @"
+
+# $Description
+try {
+    $Command
+    Write-Host "  [OK] $Description" -ForegroundColor Green
+} catch {
+    Write-Host "  [FAIL] $Description - `$_" -ForegroundColor Red
+}
+"@
+    Add-Content -Path $rollbackFile -Value $block
+}
+
+function Invoke-Rollback {
+    Write-Section "AUTO-ROLLBACK TRIGGERED"
+    Write-Log "Errors detected. Rolling back all changes..." "WARN"
     
-    # We'll use a simple approach - parse key sections
-    $manifest = @{
-        version = "1.0"
-        aggressiveness_level = "light"
-        critical_keep_list = @{
-            processes = @()
-            services = @()
+    foreach ($cmd in $script:RollbackCommands) {
+        try {
+            Write-Log "Reverting: $($cmd.Description)" "INFO"
+            Invoke-Expression $cmd.Command
+            Write-Log "Reverted: $($cmd.Description)" "SUCCESS"
+        } catch {
+            Write-Log "Failed to revert: $($cmd.Description) - $_" "ERROR"
         }
-        categories = @{}
     }
     
-    # Extract aggressiveness level
-    if ($content -match "aggressiveness_level:\s*(\w+)") {
-        $manifest.aggressiveness_level = $matches[1]
-    }
-    
-    return $manifest, $content
+    Write-Log "Rollback complete." "INFO"
 }
 
-# Check if service exists
-function Test-ServiceExists {
-    param([string]$Name)
-    $svc = Get-Service -Name $Name -ErrorAction SilentlyContinue
-    return $null -ne $svc
-}
+# ============================================================================
+# SERVICE OPERATIONS
+# ============================================================================
 
-# Disable service
-function Disable-ServiceSafely {
+function Disable-ServiceSafe {
     param(
         [string]$Name,
-        [string]$Description,
+        [string]$Reason,
         [bool]$IsDryRun
     )
     
-    if (-not (Test-ServiceExists $Name)) {
-        Write-Log "Service not found: $Name" "WARNING"
-        return
+    $svc = Get-Service -Name $Name -ErrorAction SilentlyContinue
+    if (-not $svc) {
+        Write-Log "Service not found: $Name" "WARN"
+        return $false
     }
     
-    $svc = Get-Service -Name $Name
-    $beforeState = @{
-        StartType = (Get-WmiObject Win32_Service -Filter "Name='$Name'").StartMode
-        Status = $svc.Status
-    }
+    $wmiSvc = Get-WmiObject Win32_Service -Filter "Name='$Name'" -ErrorAction SilentlyContinue
+    $beforeType = if ($wmiSvc) { $wmiSvc.StartMode } else { "Unknown" }
+    $beforeStatus = $svc.Status
     
     if ($IsDryRun) {
-        Write-Log "WOULD disable service: $Name ($Description)" "DRYRUN"
-        Write-Log "  Current: StartType=$($beforeState.StartType), Status=$($beforeState.Status)" "DRYRUN"
-        return
+        Write-Log "WOULD DISABLE: $Name ($Reason)" "DRYRUN"
+        Write-Log "  Current: $beforeType, $beforeStatus" "DRYRUN"
+        return $true
     }
     
     try {
-        # Stop service if running
+        # Stop if running
         if ($svc.Status -eq "Running") {
             Stop-Service -Name $Name -Force -ErrorAction Stop
         }
         
-        # Set to disabled
+        # Disable
         Set-Service -Name $Name -StartupType Disabled -ErrorAction Stop
         
-        Write-Log "Disabled service: $Name" "SUCCESS"
+        Write-Log "DISABLED: $Name" "SUCCESS"
+        Write-Log "  Was: $beforeType, $beforeStatus → Now: Disabled, Stopped" "INFO"
         
         # Add rollback
-        Add-Rollback "Rollback: $Name" "Set-Service -Name '$Name' -StartupType $($beforeState.StartType); Start-Service '$Name' -ErrorAction SilentlyContinue"
+        Add-RollbackCommand "Re-enable $Name" "Set-Service -Name '$Name' -StartupType $beforeType; if ('$beforeStatus' -eq 'Running') { Start-Service -Name '$Name' -ErrorAction SilentlyContinue }"
+        
+        $script:SuccessCount++
+        return $true
     }
     catch {
-        Write-Log "Failed to disable service $Name : $_" "ERROR"
+        Write-Log "FAILED: $Name - $_" "ERROR"
+        $script:ErrorCount++
+        return $false
     }
 }
 
-# Set service to manual
-function Set-ServiceManual {
-    param(
-        [string]$Name,
-        [string]$Description,
-        [bool]$IsDryRun
-    )
-    
-    if (-not (Test-ServiceExists $Name)) {
-        Write-Log "Service not found: $Name" "WARNING"
-        return
-    }
-    
-    $beforeState = (Get-WmiObject Win32_Service -Filter "Name='$Name'").StartMode
-    
-    if ($IsDryRun) {
-        Write-Log "WOULD set service to Manual: $Name ($Description)" "DRYRUN"
-        return
-    }
-    
-    try {
-        Set-Service -Name $Name -StartupType Manual -ErrorAction Stop
-        Write-Log "Set service to Manual: $Name" "SUCCESS"
-        Add-Rollback "Rollback: $Name" "Set-Service -Name '$Name' -StartupType $beforeState"
-    }
-    catch {
-        Write-Log "Failed to set service $Name to Manual: $_" "ERROR"
-    }
-}
+# ============================================================================
+# REGISTRY OPERATIONS
+# ============================================================================
 
-# Set registry value
-function Set-RegistryValue {
+function Set-RegistrySafe {
     param(
         [string]$Path,
         [string]$Name,
         [int]$Value,
-        [string]$Type = "DWord",
         [string]$Description,
         [bool]$IsDryRun
     )
     
-    # Convert path format
-    $regPath = $Path -replace "HKCU:", "HKCU:\" -replace "HKLM:", "HKLM:\"
+    $regPath = $Path -replace "^HKCU:", "HKCU:\" -replace "^HKLM:", "HKLM:\"
     
     if ($IsDryRun) {
-        Write-Log "WOULD set registry: $Path\$Name = $Value ($Description)" "DRYRUN"
-        return
+        Write-Log "WOULD SET: $Path\$Name = $Value ($Description)" "DRYRUN"
+        return $true
     }
     
     try {
-        # Create path if it doesn't exist
-        if (-not (Test-Path $regPath)) {
+        # Get current value for rollback
+        $currentValue = $null
+        $existed = $false
+        if (Test-Path $regPath) {
+            try {
+                $currentValue = Get-ItemPropertyValue -Path $regPath -Name $Name -ErrorAction SilentlyContinue
+                $existed = $true
+            } catch {}
+        } else {
             New-Item -Path $regPath -Force | Out-Null
         }
         
-        # Get current value for rollback
-        $currentValue = $null
-        try {
-            $currentValue = Get-ItemPropertyValue -Path $regPath -Name $Name -ErrorAction SilentlyContinue
-        } catch {}
+        Set-ItemProperty -Path $regPath -Name $Name -Value $Value -Type DWord -Force
         
-        # Set new value
-        Set-ItemProperty -Path $regPath -Name $Name -Value $Value -Type $Type -Force
-        
-        Write-Log "Set registry: $Path\$Name = $Value" "SUCCESS"
+        Write-Log "SET: $Path\$Name = $Value" "SUCCESS"
         
         # Add rollback
-        if ($null -ne $currentValue) {
-            Add-Rollback "Rollback: $Path\$Name" "Set-ItemProperty -Path '$regPath' -Name '$Name' -Value $currentValue -Type $Type"
+        if ($existed -and $null -ne $currentValue) {
+            Add-RollbackCommand "Restore $Name" "Set-ItemProperty -Path '$regPath' -Name '$Name' -Value $currentValue -Type DWord"
         } else {
-            Add-Rollback "Rollback: $Path\$Name" "Remove-ItemProperty -Path '$regPath' -Name '$Name' -ErrorAction SilentlyContinue"
+            Add-RollbackCommand "Remove $Name" "Remove-ItemProperty -Path '$regPath' -Name '$Name' -ErrorAction SilentlyContinue"
         }
+        
+        $script:SuccessCount++
+        return $true
     }
     catch {
-        Write-Log "Failed to set registry $Path\$Name : $_" "ERROR"
+        Write-Log "FAILED: $Path\$Name - $_" "ERROR"
+        $script:ErrorCount++
+        return $false
     }
 }
 
-# Remove AppX package
-function Remove-AppxPackageSafely {
+# ============================================================================
+# APPX REMOVAL
+# ============================================================================
+
+function Remove-AppxSafe {
     param(
         [string]$PackageName,
         [string]$Description,
@@ -293,282 +281,247 @@ function Remove-AppxPackageSafely {
     $packages = Get-AppxPackage -AllUsers -Name "*$PackageName*" -ErrorAction SilentlyContinue
     
     if (-not $packages) {
-        Write-Log "AppX package not found: $PackageName" "WARNING"
-        return
+        Write-Log "Package not found: $PackageName" "WARN"
+        return $false
     }
     
     foreach ($pkg in $packages) {
         if ($IsDryRun) {
-            Write-Log "WOULD remove AppX: $($pkg.Name) ($Description)" "DRYRUN"
+            Write-Log "WOULD REMOVE: $($pkg.Name)" "DRYRUN"
             continue
         }
         
         try {
-            # Remove for all users
             Get-AppxPackage -AllUsers -Name $pkg.Name | Remove-AppxPackage -AllUsers -ErrorAction Stop
-            
-            # Remove provisioned package to prevent reinstall
-            $provisioned = Get-AppxProvisionedPackage -Online | Where-Object { $_.PackageName -like "*$PackageName*" }
-            if ($provisioned) {
-                Remove-AppxProvisionedPackage -Online -PackageName $provisioned.PackageName -ErrorAction SilentlyContinue
-            }
-            
-            Write-Log "Removed AppX: $($pkg.Name)" "SUCCESS"
-            Add-Rollback "Reinstall: $PackageName" "# Manual reinstall from Microsoft Store required for $PackageName"
+            Write-Log "REMOVED: $($pkg.Name)" "SUCCESS"
+            Add-RollbackCommand "Reinstall $PackageName" "# Manual: Reinstall from Microsoft Store"
+            $script:SuccessCount++
         }
         catch {
-            Write-Log "Failed to remove AppX $($pkg.Name): $_" "ERROR"
+            Write-Log "FAILED: $($pkg.Name) - $_" "ERROR"
+            $script:ErrorCount++
         }
     }
+    return $true
 }
 
-# Disable startup item
-function Disable-StartupItem {
-    param(
-        [string]$Name,
-        [string]$Description,
-        [bool]$IsDryRun
-    )
-    
-    # Check registry locations
-    $locations = @(
-        "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run",
-        "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run"
-    )
-    
-    foreach ($loc in $locations) {
-        if (-not (Test-Path $loc)) { continue }
-        
-        $item = Get-ItemProperty -Path $loc -Name $Name -ErrorAction SilentlyContinue
-        if ($item) {
-            if ($IsDryRun) {
-                Write-Log "WOULD disable startup: $Name at $loc ($Description)" "DRYRUN"
-                continue
-            }
-            
-            try {
-                # Disable by setting first byte to 03
-                $currentValue = (Get-ItemProperty -Path $loc -Name $Name).$Name
-                $disabledValue = [byte[]]@(0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
-                Set-ItemProperty -Path $loc -Name $Name -Value $disabledValue -Type Binary
-                
-                Write-Log "Disabled startup: $Name" "SUCCESS"
-                Add-Rollback "Rollback: $Name startup" "Set-ItemProperty -Path '$loc' -Name '$Name' -Value ([byte[]]@($($currentValue -join ', '))) -Type Binary"
-            }
-            catch {
-                Write-Log "Failed to disable startup $Name : $_" "ERROR"
-            }
-        }
-    }
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
+
+# Check admin
+$isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+
+if ($Execute -and -not $isAdmin) {
+    Write-Host "ERROR: Run as Administrator" -ForegroundColor Red
+    exit 1
 }
 
-# Disable scheduled task
-function Disable-ScheduledTaskSafely {
-    param(
-        [string]$TaskPath,
-        [string]$TaskName,
-        [string]$Description,
-        [bool]$IsDryRun
-    )
-    
-    $task = Get-ScheduledTask -TaskPath $TaskPath -TaskName $TaskName -ErrorAction SilentlyContinue
-    
-    if (-not $task) {
-        Write-Log "Scheduled task not found: $TaskPath$TaskName" "WARNING"
-        return
-    }
-    
-    if ($IsDryRun) {
-        Write-Log "WOULD disable task: $TaskPath$TaskName ($Description)" "DRYRUN"
-        return
-    }
-    
-    try {
-        Disable-ScheduledTask -TaskPath $TaskPath -TaskName $TaskName -ErrorAction Stop | Out-Null
-        Write-Log "Disabled task: $TaskPath$TaskName" "SUCCESS"
-        Add-Rollback "Rollback: $TaskName" "Enable-ScheduledTask -TaskPath '$TaskPath' -TaskName '$TaskName'"
-    }
-    catch {
-        Write-Log "Failed to disable task $TaskPath$TaskName : $_" "ERROR"
-    }
+if (-not $DryRun -and -not $Execute) {
+    Write-Host "Usage: .\execute_cleanup.ps1 -DryRun | -Execute [-Level light|moderate|aggressive]" -ForegroundColor Yellow
+    exit 1
 }
 
-# Main execution
+# Header
+Clear-Host
 Write-Host ""
-Write-Host "========================================" -ForegroundColor Blue
-Write-Host " Windows Optimization Toolkit" -ForegroundColor Blue
-Write-Host " Cleanup Executor" -ForegroundColor Blue
-Write-Host "========================================" -ForegroundColor Blue
-Write-Host ""
-
-$mode = if ($DryRun) { "DRY RUN" } else { "EXECUTE" }
-Write-Host "Mode: $mode" -ForegroundColor $(if ($DryRun) { "Cyan" } else { "Yellow" })
-Write-Host "Manifest: $manifestFullPath"
-Write-Host "Log: $logFile"
+Write-Host "  ██████╗ ███████╗ █████╗ ██████╗ ███████╗██████╗ " -ForegroundColor Red
+Write-Host "  ██╔══██╗██╔════╝██╔══██╗██╔══██╗██╔════╝██╔══██╗" -ForegroundColor Red
+Write-Host "  ██████╔╝█████╗  ███████║██████╔╝█████╗  ██████╔╝" -ForegroundColor Red
+Write-Host "  ██╔══██╗██╔══╝  ██╔══██║██╔═══╝ ██╔══╝  ██╔══██╗" -ForegroundColor Red
+Write-Host "  ██║  ██║███████╗██║  ██║██║     ███████╗██║  ██║" -ForegroundColor Red
+Write-Host "  ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝" -ForegroundColor Red
 Write-Host ""
 
-# Initialize log
-Write-Log "Session started - Mode: $mode"
-Write-Log "Manifest: $manifestFullPath"
+$mode = if ($DryRun) { "DRY RUN (Preview)" } else { "EXECUTE" }
+Write-Host "  Mode: $mode" -ForegroundColor $(if ($DryRun) { "Cyan" } else { "Yellow" })
+Write-Host "  Level: $Level" -ForegroundColor White
+Write-Host "  Log: $logFile" -ForegroundColor DarkGray
+Write-Host ""
+
+# Initialize
+Write-Log "Session started - Mode: $mode, Level: $Level" "INFO"
 
 if (-not $DryRun) {
     Initialize-Rollback
-}
-
-# Load manifest
-$manifest, $manifestContent = Load-Manifest $manifestFullPath
-
-# Determine level
-$effectiveLevel = if ($Level) { $Level } else { $manifest.aggressiveness_level }
-Write-Log "Aggressiveness level: $effectiveLevel"
-
-# Create restore point if executing
-if ($Execute -and -not $SkipRestorePoint) {
-    Write-Log "Creating system restore point..."
-    try {
-        Enable-ComputerRestore -Drive "C:\" -ErrorAction SilentlyContinue
-        Checkpoint-Computer -Description "Windows Optimization Toolkit - $timestamp" -RestorePointType "MODIFY_SETTINGS" -ErrorAction Stop
-        Write-Log "Restore point created" "SUCCESS"
-    }
-    catch {
-        Write-Log "Could not create restore point: $_" "WARNING"
-        Write-Host ""
-        $continue = Read-Host "Continue without restore point? (y/N)"
-        if ($continue -ne "y" -and $continue -ne "Y") {
-            Write-Log "Execution cancelled by user"
-            exit 0
+    
+    # Create restore point
+    if (-not $SkipRestorePoint) {
+        Write-Section "CREATING RESTORE POINT"
+        try {
+            Enable-ComputerRestore -Drive "C:\" -ErrorAction SilentlyContinue
+            Checkpoint-Computer -Description "REAPER $timestamp" -RestorePointType MODIFY_SETTINGS -ErrorAction Stop
+            Write-Log "Restore point created" "SUCCESS"
+        }
+        catch {
+            Write-Log "Could not create restore point: $_" "WARN"
         }
     }
-}
-
-# Confirm execution
-if ($Execute) {
+    
+    # Confirmation
     Write-Host ""
-    Write-Host "WARNING: This will make changes to your system." -ForegroundColor Yellow
-    $confirm = Read-Host "Continue? (y/N)"
+    Write-Host "  This will modify system services and registry." -ForegroundColor Yellow
+    $confirm = Read-Host "  Continue? (y/N)"
     if ($confirm -ne "y" -and $confirm -ne "Y") {
-        Write-Log "Execution cancelled by user"
+        Write-Log "Cancelled by user" "INFO"
         exit 0
     }
-    Write-Host ""
 }
 
-# Apply changes based on level
-Write-Log "Applying $effectiveLevel level optimizations..."
+# ============================================================================
+# SERVICES TO DISABLE
+# ============================================================================
 
-# === TELEMETRY (all levels) ===
-Write-Log "--- Telemetry ---"
+Write-Section "SERVICES"
 
-# DiagTrack service
-Disable-ServiceSafely -Name "DiagTrack" -Description "Connected User Experiences and Telemetry" -IsDryRun $DryRun
-
-# dmwappushservice
-Disable-ServiceSafely -Name "dmwappushservice" -Description "WAP Push Message Routing Service" -IsDryRun $DryRun
-
-# Advertising ID
-Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo" -Name "Enabled" -Value 0 -Description "Advertising ID" -IsDryRun $DryRun
-
-# === ADS AND SUGGESTIONS (all levels) ===
-Write-Log "--- Ads and Suggestions ---"
-
-$adKeys = @(
-    @{Name = "SubscribedContent-338388Enabled"; Desc = "Suggested apps in Start"},
-    @{Name = "SubscribedContent-338389Enabled"; Desc = "Suggested apps"},
-    @{Name = "SubscribedContent-353694Enabled"; Desc = "Suggestions"},
-    @{Name = "SubscribedContent-353696Enabled"; Desc = "Suggestions"},
-    @{Name = "RotatingLockScreenOverlayEnabled"; Desc = "Lock screen tips"},
-    @{Name = "SubscribedContent-338387Enabled"; Desc = "Lock screen suggestions"},
-    @{Name = "SoftLandingEnabled"; Desc = "Windows tips"},
-    @{Name = "SubscribedContent-338393Enabled"; Desc = "Settings suggestions"},
-    @{Name = "SubscribedContent-353698Enabled"; Desc = "Settings suggestions"}
+$services = @(
+    # Telemetry
+    @{Name="DiagTrack"; Reason="Telemetry"}
+    @{Name="dmwappushservice"; Reason="Telemetry"}
+    
+    # Xbox (not needed for Steam/Epic)
+    @{Name="XblAuthManager"; Reason="Xbox - Steam/Epic don't use this"}
+    @{Name="XblGameSave"; Reason="Xbox cloud saves - Steam has its own"}
+    @{Name="XboxGipSvc"; Reason="Xbox accessories - standard controllers work without"}
+    @{Name="XboxNetApiSvc"; Reason="Xbox networking - not used by Steam/Epic"}
+    
+    # Updaters
+    @{Name="edgeupdate"; Reason="Edge updater - updates via Windows Update"}
+    @{Name="edgeupdatem"; Reason="Edge updater"}
+    @{Name="gupdate"; Reason="Google updater"}
+    @{Name="gupdatem"; Reason="Google updater"}
+    
+    # RGB/Hardware
+    @{Name="Razer Chroma SDK Service"; Reason="RGB sync - devices work without"}
+    @{Name="Razer Chroma SDK Server"; Reason="RGB sync"}
+    @{Name="Razer Chroma Stream Server"; Reason="RGB streaming"}
+    @{Name="ArmouryCrateService"; Reason="ASUS bloat - hardware works via BIOS"}
+    @{Name="ROG Live Service"; Reason="ASUS bloat"}
+    @{Name="asComSvc"; Reason="ASUS bloat"}
+    @{Name="LGHUBUpdaterService"; Reason="Logitech updater"}
 )
 
-foreach ($key in $adKeys) {
-    Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -Name $key.Name -Value 0 -Description $key.Desc -IsDryRun $DryRun
+# Add moderate level services
+if ($Level -in @("moderate", "aggressive")) {
+    $services += @(
+        @{Name="CortexLauncherService"; Reason="Razer Cortex - no real benefit"}
+        @{Name="Razer Game Manager Service 3"; Reason="Razer game detection"}
+        @{Name="RzActionSvc"; Reason="Razer macros"}
+        @{Name="Steam Client Service"; Reason="Starts on-demand when needed"}
+        @{Name="ClickToRunSvc"; Reason="Office starts this on-demand"}
+        @{Name="Apple Mobile Device Service"; Reason="Only when syncing iPhone"}
+        @{Name="Bonjour Service"; Reason="iTunes network discovery"}
+    )
 }
 
-# === RGB SOFTWARE (all levels) ===
-Write-Log "--- RGB Software ---"
-
-# Razer services
-Set-ServiceManual -Name "Razer Chroma SDK Service" -Description "Razer Chroma SDK" -IsDryRun $DryRun
-Set-ServiceManual -Name "Razer Chroma SDK Server" -Description "Razer Chroma SDK Server" -IsDryRun $DryRun
-
-# Disable startup
-Disable-StartupItem -Name "Razer Synapse" -Description "Razer Synapse" -IsDryRun $DryRun
-
-# === MODERATE AND AGGRESSIVE LEVELS ===
-if ($effectiveLevel -in @("moderate", "aggressive")) {
-    Write-Log "--- AI Features (Moderate+) ---"
-    
-    # Copilot - Registry disable
-    Set-RegistryValue -Path "HKCU:\Software\Policies\Microsoft\Windows\WindowsCopilot" -Name "TurnOffWindowsCopilot" -Value 1 -Description "Disable Copilot (HKCU)" -IsDryRun $DryRun
-    Set-RegistryValue -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot" -Name "TurnOffWindowsCopilot" -Value 1 -Description "Disable Copilot (HKLM)" -IsDryRun $DryRun
-    
-    # Remove Copilot AppX
-    Remove-AppxPackageSafely -PackageName "Microsoft.Copilot" -Description "Microsoft Copilot" -IsDryRun $DryRun
-    Remove-AppxPackageSafely -PackageName "Microsoft.Windows.Copilot" -Description "Windows Copilot" -IsDryRun $DryRun
-    
-    # Recall
-    Set-RegistryValue -Path "HKCU:\Software\Policies\Microsoft\Windows\WindowsAI" -Name "DisableAIDataAnalysis" -Value 1 -Description "Disable Recall" -IsDryRun $DryRun
-    
-    Write-Log "--- Bloatware (Moderate+) ---"
-    
-    # Xbox services to manual (keep for gaming)
-    Set-ServiceManual -Name "XblAuthManager" -Description "Xbox Live Auth Manager" -IsDryRun $DryRun
-    Set-ServiceManual -Name "XblGameSave" -Description "Xbox Live Game Save" -IsDryRun $DryRun
-    Set-ServiceManual -Name "XboxGipSvc" -Description "Xbox Accessory Management" -IsDryRun $DryRun
-    Set-ServiceManual -Name "XboxNetApiSvc" -Description "Xbox Live Networking" -IsDryRun $DryRun
-    
-    # Remove bloatware apps
-    Remove-AppxPackageSafely -PackageName "Microsoft.549981C3F5F10" -Description "Cortana" -IsDryRun $DryRun
-    Remove-AppxPackageSafely -PackageName "Microsoft.YourPhone" -Description "Phone Link" -IsDryRun $DryRun
-    Remove-AppxPackageSafely -PackageName "Microsoft.WindowsFeedbackHub" -Description "Feedback Hub" -IsDryRun $DryRun
-    Remove-AppxPackageSafely -PackageName "Microsoft.GetHelp" -Description "Get Help" -IsDryRun $DryRun
-    Remove-AppxPackageSafely -PackageName "Microsoft.Getstarted" -Description "Tips" -IsDryRun $DryRun
-    
-    # Disable telemetry tasks
-    Disable-ScheduledTaskSafely -TaskPath "\Microsoft\Windows\Application Experience\" -TaskName "Microsoft Compatibility Appraiser" -Description "Compatibility Telemetry" -IsDryRun $DryRun
-    Disable-ScheduledTaskSafely -TaskPath "\Microsoft\Windows\Application Experience\" -TaskName "ProgramDataUpdater" -Description "Program Data Updater" -IsDryRun $DryRun
+# Add aggressive level services
+if ($Level -eq "aggressive") {
+    $services += @(
+        @{Name="AsusFanControlService"; Reason="BIOS handles fans"}
+        @{Name="AsusCertService"; Reason="ASUS certs"}
+        @{Name="FileSyncHelper"; Reason="OneDrive sync helper"}
+    )
 }
 
-# === AGGRESSIVE LEVEL ONLY ===
-if ($effectiveLevel -eq "aggressive") {
-    Write-Log "--- Aggressive Optimizations ---"
-    
-    # More bloatware removal
-    Remove-AppxPackageSafely -PackageName "Microsoft.BingWeather" -Description "Weather" -IsDryRun $DryRun
-    Remove-AppxPackageSafely -PackageName "Microsoft.BingNews" -Description "News" -IsDryRun $DryRun
-    Remove-AppxPackageSafely -PackageName "Microsoft.People" -Description "People" -IsDryRun $DryRun
-    Remove-AppxPackageSafely -PackageName "Microsoft.WindowsMaps" -Description "Maps" -IsDryRun $DryRun
-    Remove-AppxPackageSafely -PackageName "Microsoft.ZuneMusic" -Description "Groove Music" -IsDryRun $DryRun
-    Remove-AppxPackageSafely -PackageName "Microsoft.ZuneVideo" -Description "Movies & TV" -IsDryRun $DryRun
-    Remove-AppxPackageSafely -PackageName "Clipchamp.Clipchamp" -Description "Clipchamp" -IsDryRun $DryRun
-    Remove-AppxPackageSafely -PackageName "MicrosoftTeams" -Description "Teams" -IsDryRun $DryRun
-    
-    # Disable more services
-    Set-ServiceManual -Name "Fax" -Description "Fax Service" -IsDryRun $DryRun
+foreach ($svc in $services) {
+    Disable-ServiceSafe -Name $svc.Name -Reason $svc.Reason -IsDryRun $DryRun
 }
 
-# Finalize
-Write-Log "Session complete"
+# ============================================================================
+# REGISTRY - Disable telemetry and ads
+# ============================================================================
 
+Write-Section "REGISTRY"
+
+$regKeys = @(
+    @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo"; Name="Enabled"; Value=0; Desc="Advertising ID"}
+    @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"; Name="SubscribedContent-338388Enabled"; Value=0; Desc="Start menu suggestions"}
+    @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"; Name="SubscribedContent-338389Enabled"; Value=0; Desc="App suggestions"}
+    @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"; Name="SoftLandingEnabled"; Value=0; Desc="Windows tips"}
+)
+
+if ($Level -in @("moderate", "aggressive")) {
+    $regKeys += @(
+        @{Path="HKCU:\Software\Policies\Microsoft\Windows\WindowsCopilot"; Name="TurnOffWindowsCopilot"; Value=1; Desc="Disable Copilot"}
+        @{Path="HKCU:\Software\Policies\Microsoft\Windows\WindowsAI"; Name="DisableAIDataAnalysis"; Value=1; Desc="Disable Recall"}
+    )
+}
+
+foreach ($key in $regKeys) {
+    Set-RegistrySafe -Path $key.Path -Name $key.Name -Value $key.Value -Description $key.Desc -IsDryRun $DryRun
+}
+
+# ============================================================================
+# APPX PACKAGES (moderate+)
+# ============================================================================
+
+if ($Level -in @("moderate", "aggressive") -and -not $DryRun) {
+    Write-Section "APPS"
+    
+    $apps = @(
+        @{Name="Microsoft.549981C3F5F10"; Desc="Cortana"}
+        @{Name="Microsoft.Copilot"; Desc="Copilot"}
+        @{Name="Microsoft.WindowsFeedbackHub"; Desc="Feedback Hub"}
+        @{Name="Microsoft.GetHelp"; Desc="Get Help"}
+        @{Name="Microsoft.Getstarted"; Desc="Tips"}
+    )
+    
+    foreach ($app in $apps) {
+        Remove-AppxSafe -PackageName $app.Name -Description $app.Desc -IsDryRun $DryRun
+    }
+}
+
+# ============================================================================
+# SUMMARY
+# ============================================================================
+
+Write-Section "SUMMARY"
+
+$summary = @"
+REAPER Execution Summary
+========================
+Time: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+Mode: $mode
+Level: $Level
+
+Results:
+  Successful: $($script:SuccessCount)
+  Failed: $($script:ErrorCount)
+
+Files:
+  Log: $logFile
+  Rollback: $rollbackFile
+"@
+
+Write-Host $summary
+Set-Content -Path $summaryFile -Value $summary
+
+# Auto-rollback on error
+if ($AutoRollbackOnError -and $script:ErrorCount -gt 0 -and -not $DryRun) {
+    Invoke-Rollback
+}
+
+# Finalize rollback script
 if (-not $DryRun) {
-    # Finish rollback script
-    Add-Content -Path $rollbackFile -Value 'Write-Host "Rollback complete."'
-    Write-Log "Rollback script saved: $rollbackFile"
+    Add-Content -Path $rollbackFile -Value @"
+
+Write-Host ""
+Write-Host "Rollback complete. $($script:RollbackCommands.Count) items restored." -ForegroundColor Green
+Write-Host "You may need to restart for all changes to take effect."
+"@
 }
 
 Write-Host ""
-Write-Host "========================================" -ForegroundColor Blue
-Write-Host " Complete" -ForegroundColor Green
-Write-Host "========================================" -ForegroundColor Blue
-Write-Host ""
-Write-Host "Log file: $logFile"
+if ($script:ErrorCount -eq 0) {
+    Write-Host "  ✓ Complete! No errors." -ForegroundColor Green
+} else {
+    Write-Host "  ⚠ Complete with $($script:ErrorCount) errors." -ForegroundColor Yellow
+}
+
 if (-not $DryRun) {
-    Write-Host "Rollback script: $rollbackFile"
     Write-Host ""
-    Write-Host "To undo changes, run:" -ForegroundColor Yellow
+    Write-Host "  To undo all changes:" -ForegroundColor DarkGray
     Write-Host "  .\$rollbackFile" -ForegroundColor Cyan
 }
+
 Write-Host ""

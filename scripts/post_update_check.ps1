@@ -1,237 +1,109 @@
 <#
 .SYNOPSIS
-    Windows Optimization Toolkit - Post-Update Check
+    REAPER Post-Update Protection
     
 .DESCRIPTION
-    Checks if Windows Update has reverted any optimizations and reapplies them.
-    Can be run manually or scheduled as a task.
+    Runs after Windows Update to re-apply service settings.
+    Installed as a scheduled task by setup.ps1
     
 .PARAMETER AutoReapply
-    Automatically reapply changes without prompting.
+    Automatically re-disable services without prompting.
     
-.PARAMETER LogOnly
-    Only log findings, don't make any changes.
-    
-.EXAMPLE
-    .\post_update_check.ps1
-    
-.EXAMPLE
-    .\post_update_check.ps1 -AutoReapply
+.PARAMETER Level
+    Aggressiveness level to apply.
 #>
 
 param(
     [switch]$AutoReapply,
-    [switch]$LogOnly
+    [ValidateSet("light", "moderate", "aggressive")]
+    [string]$Level = "moderate"
 )
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectRoot = Split-Path -Parent $scriptDir
 $logsDir = Join-Path $projectRoot "data\audit_logs"
 $timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
+$logFile = Join-Path $logsDir "${timestamp}_postupdate.log"
 
-# Ensure logs directory exists
-if (-not (Test-Path $logsDir)) {
-    New-Item -ItemType Directory -Path $logsDir -Force | Out-Null
-}
-
-$logFile = Join-Path $logsDir "protection_${timestamp}.log"
+# Ensure logs directory
+if (-not (Test-Path $logsDir)) { New-Item -ItemType Directory -Path $logsDir -Force | Out-Null }
 
 function Write-Log {
-    param([string]$Message, [string]$Level = "INFO")
-    $logEntry = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [$Level] $Message"
-    Add-Content -Path $logFile -Value $logEntry
-    
-    $color = switch ($Level) {
-        "ERROR" { "Red" }
-        "WARNING" { "Yellow" }
-        "SUCCESS" { "Green" }
-        "REVERT" { "Magenta" }
-        default { "White" }
-    }
-    Write-Host $logEntry -ForegroundColor $color
+    param([string]$Message)
+    $line = "[$(Get-Date -Format 'HH:mm:ss')] $Message"
+    Add-Content -Path $logFile -Value $line
+    Write-Host $line
 }
 
-function Test-RegistryValue {
-    param(
-        [string]$Path,
-        [string]$Name,
-        [int]$ExpectedValue
+Write-Log "REAPER Post-Update Check started"
+Write-Log "Level: $Level"
+
+# Services that should be disabled
+$targetServices = @(
+    "DiagTrack", "dmwappushservice",
+    "XblAuthManager", "XblGameSave", "XboxGipSvc", "XboxNetApiSvc",
+    "edgeupdate", "edgeupdatem",
+    "Razer Chroma SDK Service", "Razer Chroma SDK Server",
+    "ArmouryCrateService", "ROG Live Service"
+)
+
+if ($Level -in @("moderate", "aggressive")) {
+    $targetServices += @(
+        "CortexLauncherService", "Steam Client Service", "ClickToRunSvc",
+        "Apple Mobile Device Service", "Bonjour Service", "LGHUBUpdaterService"
     )
+}
+
+$reverted = @()
+
+foreach ($svcName in $targetServices) {
+    $svc = Get-Service -Name $svcName -ErrorAction SilentlyContinue
+    if (-not $svc) { continue }
     
-    try {
-        $value = Get-ItemPropertyValue -Path $Path -Name $Name -ErrorAction Stop
-        return @{
-            Exists = $true
-            Value = $value
-            Expected = $ExpectedValue
-            Match = ($value -eq $ExpectedValue)
-        }
-    }
-    catch {
-        return @{
-            Exists = $false
-            Value = $null
-            Expected = $ExpectedValue
-            Match = $false
-        }
-    }
-}
-
-function Test-ServiceStartType {
-    param(
-        [string]$Name,
-        [string]$ExpectedType
-    )
-    
-    $svc = Get-Service -Name $Name -ErrorAction SilentlyContinue
-    if (-not $svc) {
-        return @{
-            Exists = $false
-            CurrentType = $null
-            Expected = $ExpectedType
-            Match = $false
-        }
-    }
-    
-    $wmiSvc = Get-WmiObject Win32_Service -Filter "Name='$Name'"
-    $currentType = $wmiSvc.StartMode
-    
-    return @{
-        Exists = $true
-        CurrentType = $currentType
-        Expected = $ExpectedType
-        Match = ($currentType -eq $ExpectedType)
-    }
-}
-
-function Test-AppxInstalled {
-    param([string]$PackageName)
-    
-    $pkg = Get-AppxPackage -AllUsers -Name "*$PackageName*" -ErrorAction SilentlyContinue
-    return ($null -ne $pkg)
-}
-
-Write-Host ""
-Write-Host "========================================" -ForegroundColor Blue
-Write-Host " Windows Optimization Toolkit" -ForegroundColor Blue
-Write-Host " Post-Update Protection Check" -ForegroundColor Blue
-Write-Host "========================================" -ForegroundColor Blue
-Write-Host ""
-
-Write-Log "Post-update check started"
-
-$issues = @()
-
-# === Check Telemetry Settings ===
-Write-Log "Checking telemetry settings..."
-
-$diagTrack = Test-ServiceStartType -Name "DiagTrack" -ExpectedType "Disabled"
-if ($diagTrack.Exists -and -not $diagTrack.Match) {
-    Write-Log "DiagTrack service reverted to $($diagTrack.CurrentType)" "REVERT"
-    $issues += @{Type = "Service"; Name = "DiagTrack"; Expected = "Disabled"; Current = $diagTrack.CurrentType}
-}
-
-$dmwappush = Test-ServiceStartType -Name "dmwappushservice" -ExpectedType "Disabled"
-if ($dmwappush.Exists -and -not $dmwappush.Match) {
-    Write-Log "dmwappushservice reverted to $($dmwappush.CurrentType)" "REVERT"
-    $issues += @{Type = "Service"; Name = "dmwappushservice"; Expected = "Disabled"; Current = $dmwappush.CurrentType}
-}
-
-# === Check Copilot Settings ===
-Write-Log "Checking Copilot settings..."
-
-$copilotHKCU = Test-RegistryValue -Path "HKCU:\Software\Policies\Microsoft\Windows\WindowsCopilot" -Name "TurnOffWindowsCopilot" -ExpectedValue 1
-if (-not $copilotHKCU.Match) {
-    Write-Log "Copilot registry (HKCU) not set or reverted" "REVERT"
-    $issues += @{Type = "Registry"; Path = "HKCU:\Software\Policies\Microsoft\Windows\WindowsCopilot"; Name = "TurnOffWindowsCopilot"; Expected = 1; Current = $copilotHKCU.Value}
-}
-
-$copilotHKLM = Test-RegistryValue -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot" -Name "TurnOffWindowsCopilot" -ExpectedValue 1
-if (-not $copilotHKLM.Match) {
-    Write-Log "Copilot registry (HKLM) not set or reverted" "REVERT"
-    $issues += @{Type = "Registry"; Path = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot"; Name = "TurnOffWindowsCopilot"; Expected = 1; Current = $copilotHKLM.Value}
-}
-
-# === Check Advertising ID ===
-Write-Log "Checking advertising settings..."
-
-$adId = Test-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo" -Name "Enabled" -ExpectedValue 0
-if (-not $adId.Match) {
-    Write-Log "Advertising ID setting reverted" "REVERT"
-    $issues += @{Type = "Registry"; Path = "HKCU:\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo"; Name = "Enabled"; Expected = 0; Current = $adId.Value}
-}
-
-# === Check Copilot App Reinstalled ===
-Write-Log "Checking for reinstalled apps..."
-
-if (Test-AppxInstalled "Microsoft.Copilot") {
-    Write-Log "Microsoft Copilot app was reinstalled" "REVERT"
-    $issues += @{Type = "AppX"; Name = "Microsoft.Copilot"; Status = "Reinstalled"}
-}
-
-if (Test-AppxInstalled "Microsoft.Windows.Copilot") {
-    Write-Log "Windows Copilot app was reinstalled" "REVERT"
-    $issues += @{Type = "AppX"; Name = "Microsoft.Windows.Copilot"; Status = "Reinstalled"}
-}
-
-# === Summary ===
-Write-Host ""
-if ($issues.Count -eq 0) {
-    Write-Log "All optimizations intact - no reverts detected" "SUCCESS"
-} else {
-    Write-Log "Found $($issues.Count) reverted settings" "WARNING"
-    
-    if ($LogOnly) {
-        Write-Log "Log-only mode - no changes made"
-    } elseif ($AutoReapply) {
-        Write-Log "Auto-reapply mode - fixing issues..."
+    $wmi = Get-WmiObject Win32_Service -Filter "Name='$svcName'" -ErrorAction SilentlyContinue
+    if ($wmi -and $wmi.StartMode -ne "Disabled") {
+        Write-Log "DETECTED: $svcName was re-enabled (currently: $($wmi.StartMode))"
+        $reverted += $svcName
         
-        foreach ($issue in $issues) {
-            switch ($issue.Type) {
-                "Service" {
-                    try {
-                        if ($issue.Expected -eq "Disabled") {
-                            Set-Service -Name $issue.Name -StartupType Disabled -ErrorAction Stop
-                            Stop-Service -Name $issue.Name -Force -ErrorAction SilentlyContinue
-                        } else {
-                            Set-Service -Name $issue.Name -StartupType $issue.Expected -ErrorAction Stop
-                        }
-                        Write-Log "Fixed service: $($issue.Name)" "SUCCESS"
-                    }
-                    catch {
-                        Write-Log "Failed to fix service $($issue.Name): $_" "ERROR"
-                    }
+        if ($AutoReapply) {
+            try {
+                if ($svc.Status -eq "Running") {
+                    Stop-Service -Name $svcName -Force -ErrorAction SilentlyContinue
                 }
-                "Registry" {
-                    try {
-                        if (-not (Test-Path $issue.Path)) {
-                            New-Item -Path $issue.Path -Force | Out-Null
-                        }
-                        Set-ItemProperty -Path $issue.Path -Name $issue.Name -Value $issue.Expected -Type DWord -Force
-                        Write-Log "Fixed registry: $($issue.Path)\$($issue.Name)" "SUCCESS"
-                    }
-                    catch {
-                        Write-Log "Failed to fix registry $($issue.Path)\$($issue.Name): $_" "ERROR"
-                    }
-                }
-                "AppX" {
-                    try {
-                        Get-AppxPackage -AllUsers -Name "*$($issue.Name)*" | Remove-AppxPackage -AllUsers -ErrorAction Stop
-                        Write-Log "Removed reinstalled app: $($issue.Name)" "SUCCESS"
-                    }
-                    catch {
-                        Write-Log "Failed to remove app $($issue.Name): $_" "ERROR"
-                    }
-                }
+                Set-Service -Name $svcName -StartupType Disabled
+                Write-Log "FIXED: $svcName disabled again"
+            }
+            catch {
+                Write-Log "ERROR: Could not disable $svcName - $_"
             }
         }
-    } else {
-        Write-Host ""
-        Write-Host "Issues found. Run with -AutoReapply to fix automatically." -ForegroundColor Yellow
-        Write-Host "Or run execute_cleanup.ps1 to reapply all optimizations." -ForegroundColor Yellow
     }
 }
 
-Write-Host ""
-Write-Host "Log saved to: $logFile"
-Write-Host ""
+# Check registry
+$copilotPath = "HKCU:\Software\Policies\Microsoft\Windows\WindowsCopilot"
+if (Test-Path $copilotPath) {
+    $val = Get-ItemPropertyValue -Path $copilotPath -Name "TurnOffWindowsCopilot" -ErrorAction SilentlyContinue
+    if ($val -ne 1) {
+        Write-Log "DETECTED: Copilot registry was reverted"
+        if ($AutoReapply) {
+            Set-ItemProperty -Path $copilotPath -Name "TurnOffWindowsCopilot" -Value 1 -Type DWord -Force
+            Write-Log "FIXED: Copilot disabled again"
+        }
+    }
+}
+
+# Summary
+Write-Log "---"
+if ($reverted.Count -eq 0) {
+    Write-Log "All settings intact. No action needed."
+} else {
+    Write-Log "Found $($reverted.Count) reverted settings."
+    if ($AutoReapply) {
+        Write-Log "All settings re-applied."
+    } else {
+        Write-Log "Run with -AutoReapply to fix, or run setup.ps1 again."
+    }
+}
+
+Write-Log "Post-update check complete."
