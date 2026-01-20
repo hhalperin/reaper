@@ -315,8 +315,14 @@ if (-not $DryRun) {
 Write-Section "SERVICES"
 
 $services = @(
-    @{Name="DiagTrack"; Reason="Telemetry - sends usage data to Microsoft"}
-    @{Name="dmwappushservice"; Reason="Telemetry - WAP push messages"}
+    # === SPYWARE/TELEMETRY (always disable) ===
+    @{Name="DiagTrack"; Reason="SPYWARE: Telemetry - sends usage data to Microsoft"}
+    @{Name="dmwappushservice"; Reason="SPYWARE: WAP push messages"}
+    @{Name="WMPNetworkSvc"; Reason="SPYWARE: Media Player network sharing"}
+    @{Name="WerSvc"; Reason="SPYWARE: Windows Error Reporting - sends crash data to Microsoft"}
+    @{Name="CDPUserSvc"; Reason="SPYWARE: Connected Devices - syncs activity across devices"}
+    @{Name="PcaSvc"; Reason="SPYWARE: Program Compatibility Assistant - telemetry"}
+    @{Name="SSDPSRV"; Reason="SPYWARE: SSDP Discovery - can be used for network profiling"}
     @{Name="XblAuthManager"; Reason="Xbox - not used by Steam/Epic games"}
     @{Name="XblGameSave"; Reason="Xbox cloud saves - Steam has its own"}
     @{Name="XboxGipSvc"; Reason="Xbox accessories - standard gamepads work without"}
@@ -379,23 +385,121 @@ if ($notFoundServices.Count -gt 0) {
 
 Write-Section "REGISTRY"
 
+# TELEMETRY & TRACKING - Always disable these
 $regKeys = @(
-    @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo"; Name="Enabled"; Value=0; Desc="Advertising ID"}
-    @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"; Name="SubscribedContent-338388Enabled"; Value=0; Desc="Start menu suggestions"}
-    @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"; Name="SubscribedContent-338389Enabled"; Value=0; Desc="App suggestions"}
-    @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"; Name="SoftLandingEnabled"; Value=0; Desc="Windows tips"}
+    # Advertising
+    @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo"; Name="Enabled"; Value=0; Desc="SPYWARE: Advertising ID tracking"}
+    
+    # App suggestions and ads
+    @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"; Name="SubscribedContent-338388Enabled"; Value=0; Desc="SPYWARE: Start menu ads"}
+    @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"; Name="SubscribedContent-338389Enabled"; Value=0; Desc="SPYWARE: App suggestions"}
+    @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"; Name="SubscribedContent-353694Enabled"; Value=0; Desc="SPYWARE: Settings suggestions"}
+    @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"; Name="SubscribedContent-353696Enabled"; Value=0; Desc="SPYWARE: Account notifications"}
+    @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"; Name="SoftLandingEnabled"; Value=0; Desc="SPYWARE: Windows tips/ads"}
+    @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"; Name="RotatingLockScreenOverlayEnabled"; Value=0; Desc="SPYWARE: Lock screen ads"}
+    @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"; Name="SilentInstalledAppsEnabled"; Value=0; Desc="SPYWARE: Silent app installs"}
+    @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"; Name="ContentDeliveryAllowed"; Value=0; Desc="SPYWARE: Content delivery"}
+    @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"; Name="PreInstalledAppsEnabled"; Value=0; Desc="SPYWARE: Pre-installed app suggestions"}
+    @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"; Name="PreInstalledAppsEverEnabled"; Value=0; Desc="SPYWARE: Block future pre-installs"}
+    @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"; Name="OemPreInstalledAppsEnabled"; Value=0; Desc="SPYWARE: OEM bloatware suggestions"}
+    
+    # Telemetry settings
+    @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\Privacy"; Name="TailoredExperiencesWithDiagnosticDataEnabled"; Value=0; Desc="SPYWARE: Tailored experiences"}
+    @{Path="HKCU:\Software\Microsoft\Siuf\Rules"; Name="NumberOfSIUFInPeriod"; Value=0; Desc="SPYWARE: Feedback frequency"}
+    
+    # Activity tracking
+    @{Path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\System"; Name="EnableActivityFeed"; Value=0; Desc="SPYWARE: Activity feed"}
+    @{Path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\System"; Name="PublishUserActivities"; Value=0; Desc="SPYWARE: Publish activities"}
+    @{Path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\System"; Name="UploadUserActivities"; Value=0; Desc="SPYWARE: Upload activities to Microsoft"}
+    
+    # Location tracking
+    @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location"; Name="Value"; Value="Deny"; Desc="SPYWARE: Location tracking"}
+    
+    # App telemetry
+    @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"; Name="Start_TrackProgs"; Value=0; Desc="SPYWARE: Track app usage"}
+    @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"; Name="Start_TrackDocs"; Value=0; Desc="SPYWARE: Track recent documents"}
 )
 
 if ($Level -in @("moderate", "aggressive")) {
     $regKeys += @(
-        @{Path="HKCU:\Software\Policies\Microsoft\Windows\WindowsCopilot"; Name="TurnOffWindowsCopilot"; Value=1; Desc="Disable Copilot"}
-        @{Path="HKCU:\Software\Policies\Microsoft\Windows\WindowsAI"; Name="DisableAIDataAnalysis"; Value=1; Desc="Disable Recall"}
+        # AI Features
+        @{Path="HKCU:\Software\Policies\Microsoft\Windows\WindowsCopilot"; Name="TurnOffWindowsCopilot"; Value=1; Desc="SPYWARE: Disable Copilot"}
+        @{Path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot"; Name="TurnOffWindowsCopilot"; Value=1; Desc="SPYWARE: Disable Copilot (system)"}
+        @{Path="HKCU:\Software\Policies\Microsoft\Windows\WindowsAI"; Name="DisableAIDataAnalysis"; Value=1; Desc="SPYWARE: Disable Recall"}
+        @{Path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsAI"; Name="DisableAIDataAnalysis"; Value=1; Desc="SPYWARE: Disable Recall (system)"}
+        
+        # Cloud clipboard
+        @{Path="HKCU:\Software\Microsoft\Clipboard"; Name="EnableClipboardHistory"; Value=0; Desc="SPYWARE: Clipboard history to cloud"}
+        
+        # Search
+        @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\Search"; Name="BingSearchEnabled"; Value=0; Desc="SPYWARE: Bing search integration"}
+        @{Path="HKCU:\Software\Microsoft\Windows\CurrentVersion\Search"; Name="CortanaConsent"; Value=0; Desc="SPYWARE: Cortana consent"}
+        
+        # Input personalization (keylogger-like)
+        @{Path="HKCU:\Software\Microsoft\InputPersonalization"; Name="RestrictImplicitInkCollection"; Value=1; Desc="SPYWARE: Ink data collection"}
+        @{Path="HKCU:\Software\Microsoft\InputPersonalization"; Name="RestrictImplicitTextCollection"; Value=1; Desc="SPYWARE: Text data collection"}
+        @{Path="HKCU:\Software\Microsoft\InputPersonalization\TrainedDataStore"; Name="HarvestContacts"; Value=0; Desc="SPYWARE: Contact harvesting"}
+        @{Path="HKCU:\Software\Microsoft\Personalization\Settings"; Name="AcceptedPrivacyPolicy"; Value=0; Desc="SPYWARE: Revoke personalization consent"}
     )
 }
 
 foreach ($key in $regKeys) {
     Set-RegistrySafe -Path $key.Path -Name $key.Name -Value $key.Value -Description $key.Desc -IsDryRun $DryRun
 }
+
+# ============================================================================
+# SCHEDULED TASKS (Telemetry/Spyware)
+# ============================================================================
+
+Write-Section "SCHEDULED TASKS (Spyware)"
+
+$tasksToDisable = @(
+    @{Path="\Microsoft\Windows\Customer Experience Improvement Program\"; Name="Consolidator"; Reason="SPYWARE: CEIP data collection"}
+    @{Path="\Microsoft\Windows\Customer Experience Improvement Program\"; Name="UsbCeip"; Reason="SPYWARE: USB usage telemetry"}
+    @{Path="\Microsoft\Windows\Application Experience\"; Name="Microsoft Compatibility Appraiser"; Reason="SPYWARE: App compatibility telemetry"}
+    @{Path="\Microsoft\Windows\Application Experience\"; Name="ProgramDataUpdater"; Reason="SPYWARE: Program inventory"}
+    @{Path="\Microsoft\Windows\Autochk\"; Name="Proxy"; Reason="SPYWARE: Autochk telemetry"}
+    @{Path="\Microsoft\Windows\DiskDiagnostic\"; Name="Microsoft-Windows-DiskDiagnosticDataCollector"; Reason="SPYWARE: Disk diagnostic data"}
+    @{Path="\Microsoft\Windows\Feedback\Siuf\"; Name="DmClient"; Reason="SPYWARE: Feedback data"}
+    @{Path="\Microsoft\Windows\Feedback\Siuf\"; Name="DmClientOnScenarioDownload"; Reason="SPYWARE: Feedback scenarios"}
+    @{Path="\Microsoft\Windows\Windows Error Reporting\"; Name="QueueReporting"; Reason="SPYWARE: Error report queue"}
+    @{Path="\Microsoft\Windows\PI\"; Name="Sqm-Tasks"; Reason="SPYWARE: SQM telemetry"}
+)
+
+if ($Level -in @("moderate", "aggressive")) {
+    $tasksToDisable += @(
+        @{Path="\Microsoft\Windows\Maps\"; Name="MapsToastTask"; Reason="Maps notification spam"}
+        @{Path="\Microsoft\Windows\Maps\"; Name="MapsUpdateTask"; Reason="Maps updates - disable if not using"}
+        @{Path="\Microsoft\Office\"; Name="Office ClickToRun Service Monitor"; Reason="Office telemetry"}
+        @{Path="\Microsoft\Office\"; Name="OfficeTelemetryAgentFallBack2016"; Reason="Office telemetry"}
+        @{Path="\Microsoft\Office\"; Name="OfficeTelemetryAgentLogOn2016"; Reason="Office telemetry"}
+    )
+}
+
+$taskCount = 0
+foreach ($task in $tasksToDisable) {
+    $fullPath = $task.Path + $task.Name
+    try {
+        $existingTask = Get-ScheduledTask -TaskPath $task.Path -TaskName $task.Name -ErrorAction SilentlyContinue
+        if ($existingTask) {
+            if ($DryRun) {
+                Write-Log "WOULD DISABLE: $fullPath" "DRYRUN" "[->]"
+                Write-Log "  Reason: $($task.Reason)" "DRYRUN"
+            } else {
+                Disable-ScheduledTask -TaskPath $task.Path -TaskName $task.Name -ErrorAction Stop | Out-Null
+                Write-Log "Disabled task: $fullPath" "SUCCESS" "[OK]"
+                Add-Content -Path $rollbackFile -Value "Enable-ScheduledTask -TaskPath '$($task.Path)' -TaskName '$($task.Name)'"
+                $script:SuccessCount++
+            }
+            $taskCount++
+        }
+    } catch {
+        Write-Log "Failed to disable task $fullPath : $_" "ERROR" "[FAIL]"
+        $script:ErrorCount++
+    }
+}
+
+Write-Log "Tasks processed: $taskCount" "INFO"
 
 # ============================================================================
 # SUMMARY
@@ -413,6 +517,7 @@ Level: $Level
 Results:
   Services processed: $foundServices
   Registry keys: $($regKeys.Count)
+  Scheduled tasks: $taskCount
   Successful: $($script:SuccessCount)
   Failed: $($script:ErrorCount)
 
