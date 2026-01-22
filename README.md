@@ -36,6 +36,12 @@ python scripts/analyze_suspects.py
 
 # Apply (as Admin)
 .\scripts\execute_cleanup.ps1 -Execute
+
+# Optional: apply a profile
+.\scripts\execute_cleanup.ps1 -Execute -Profile gaming_steam
+
+# Compare recent snapshots
+python scripts/diff_inventory.py
 ```
 
 ## Structure
@@ -45,6 +51,7 @@ reaper/
 ├── config/
 │   ├── manifest.yaml         # What to keep/remove
 │   ├── known_processes.yaml  # Pre-researched database
+│   ├── profiles.json         # Profile presets
 │   └── settings.yaml         # Thresholds and patterns
 ├── scripts/
 │   ├── collect_inventory.py  # Phase 1
@@ -58,7 +65,9 @@ reaper/
 └── data/
     ├── inventories/          # Raw snapshots
     ├── analysis/             # Research results
-    └── audit_logs/           # Execution logs + rollback scripts
+    ├── audit_logs/           # Execution logs + rollback scripts
+    ├── backups/              # Registry backups
+    └── reports/              # Diff reports
 ```
 
 ## Levels
@@ -71,6 +80,24 @@ reaper/
 
 ```powershell
 .\scripts\execute_cleanup.ps1 -Execute -Level moderate
+```
+
+## Profiles
+
+Profiles let you override service/task/registry choices without editing the script.
+
+```powershell
+.\scripts\execute_cleanup.ps1 -Execute -Profile gaming_steam
+```
+
+Edit `config/profiles.json` to define your own.
+
+## Reports
+
+Generate a before/after diff from the two latest snapshots:
+
+```powershell
+python scripts/diff_inventory.py
 ```
 
 ## How It Works

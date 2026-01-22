@@ -8,6 +8,9 @@
     
 .PARAMETER Uninstall
     Remove the scheduled task instead of installing it.
+
+.PARAMETER Profile
+    Optional profile name from config\profiles.json.
     
 .EXAMPLE
     .\install_protection_task.ps1
@@ -17,7 +20,8 @@
 #>
 
 param(
-    [switch]$Uninstall
+    [switch]$Uninstall,
+    [string]$Profile
 )
 
 $taskName = "WindowsOptimizationToolkit_PostUpdateCheck"
@@ -69,17 +73,26 @@ if ($existingTask) {
 }
 
 # Create the action - run PowerShell with the script
+$profileArg = if ($Profile) { " -Profile $Profile" } else { "" }
 $action = New-ScheduledTaskAction `
     -Execute "powershell.exe" `
-    -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$postUpdateScript`" -AutoReapply"
+    -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$postUpdateScript`" -AutoReapply$profileArg"
 
 # Create triggers
-# Trigger 1: After Windows Update (using event log)
-# Event ID 19 = Installation Successful, Event ID 20 = Installation Failure but Restart Pending
-$trigger1 = New-ScheduledTaskTrigger -AtLogOn
+# Trigger 1: After Windows Update (event log)
+# Trigger 2: At logon (fallback)
+$subscription = @"
+<QueryList>
+  <Query Id="0" Path="Microsoft-Windows-WindowsUpdateClient/Operational">
+    <Select Path="Microsoft-Windows-WindowsUpdateClient/Operational">
+      *[System[(EventID=19 or EventID=20)]]
+    </Select>
+  </Query>
+</QueryList>
+"@
 
-# We can't easily trigger on Windows Update completion via XML in PowerShell,
-# so we'll use logon trigger + a manual trigger option
+$triggerEvent = New-ScheduledTaskTrigger -OnEvent -Subscription $subscription
+$triggerLogon = New-ScheduledTaskTrigger -AtLogOn
 
 # Create principal - run with highest privileges
 $principal = New-ScheduledTaskPrincipal `
@@ -99,7 +112,7 @@ $settings = New-ScheduledTaskSettingsSet `
 $task = New-ScheduledTask `
     -Action $action `
     -Principal $principal `
-    -Trigger $trigger1 `
+    -Trigger @($triggerEvent, $triggerLogon) `
     -Settings $settings `
     -Description "Windows Optimization Toolkit - Checks for reverted optimizations after Windows Update and reapplies them."
 
@@ -110,7 +123,7 @@ Write-Host ""
 Write-Host "Task Details:" -ForegroundColor Cyan
 Write-Host "  Name: $taskName"
 Write-Host "  Path: $taskPath"
-Write-Host "  Trigger: At logon (to catch post-update reboots)"
+Write-Host "  Trigger: Windows Update event + logon fallback"
 Write-Host "  Action: Runs post_update_check.ps1 -AutoReapply"
 Write-Host ""
 Write-Host "The task will automatically check for reverted settings" -ForegroundColor Yellow

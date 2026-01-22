@@ -1,0 +1,84 @@
+{
+  "profiles": {
+    "gaming_steam": {
+      "description": "Prioritize gaming performance while keeping Steam functional.",
+      "disable_services": [
+        "edgeupdate",
+        "edgeupdatem",
+        "Razer Chroma SDK Service",
+        "Razer Chroma SDK Server",
+        "Razer Chroma Stream Server",
+        "CortexLauncherService",
+        "Razer Game Manager Service 3",
+        "RzActionSvc",
+        "ArmouryCrateService",
+        "ROG Live Service",
+        "asComSvc",
+        "LGHUBUpdaterService"
+      ],
+      "keep_services": [
+        "Steam Client Service"
+      ],
+      "disable_startup_items": [
+        "iCloud",
+        "iCloudDrive",
+        "iCloud Services",
+        "AdobeGCInvoker-1.0"
+      ]
+    },
+    "privacy_max": {
+      "description": "Aggressive telemetry and advertising reduction.",
+      "disable_services": [
+        "DiagTrack",
+        "dmwappushservice",
+        "WMPNetworkSvc",
+        "WerSvc",
+        "PcaSvc"
+      ],
+      "disable_tasks": [
+        "\\Microsoft\\Windows\\Customer Experience Improvement Program\\Consolidator",
+        "\\Microsoft\\Windows\\Customer Experience Improvement Program\\UsbCeip",
+        "\\Microsoft\\Windows\\Autochk\\Proxy",
+        "\\Microsoft\\Windows\\DiskDiagnostic\\Microsoft-Windows-DiskDiagnosticDataCollector",
+        "\\Microsoft\\Windows\\Feedback\\Siuf\\DmClient",
+        "\\Microsoft\\Windows\\Feedback\\Siuf\\DmClientOnScenarioDownload",
+        "\\Microsoft\\Windows\\Windows Error Reporting\\QueueReporting",
+        "\\Microsoft\\Windows\\PI\\Sqm-Tasks",
+        "\\Microsoft\\Windows\\Maps\\MapsToastTask",
+        "\\Microsoft\\Windows\\Maps\\MapsUpdateTask"
+      ],
+      "registry": [
+        {
+          "path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\AdvertisingInfo",
+          "name": "Enabled",
+          "type": "DWord",
+          "value": 0
+        },
+        {
+          "path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Privacy",
+          "name": "TailoredExperiencesWithDiagnosticDataEnabled",
+          "type": "DWord",
+          "value": 0
+        }
+      ]
+    },
+    "dev_workstation": {
+      "description": "Keep dev tools responsive while trimming background noise.",
+      "disable_services": [
+        "edgeupdate",
+        "edgeupdatem",
+        "XboxGipSvc",
+        "XblAuthManager",
+        "XblGameSave",
+        "XboxNetApiSvc"
+      ],
+      "keep_services": [
+        "ClickToRunSvc"
+      ],
+      "disable_startup_items": [
+        "iCloud",
+        "OneDrive"
+      ]
+    }
+  }
+}

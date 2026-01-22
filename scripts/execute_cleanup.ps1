@@ -16,6 +16,15 @@
     
 .PARAMETER AutoRollbackOnError
     Automatically undo all changes if any error occurs.
+
+.PARAMETER Profile
+    Optional profile name from config\profiles.json to apply overrides.
+
+.PARAMETER ConfirmEach
+    Prompt before each change (services, registry, tasks, startup).
+
+.PARAMETER SkipRegistryBackup
+    Skip exporting registry backups before changes.
     
 .EXAMPLE
     .\execute_cleanup.ps1 -DryRun
@@ -27,8 +36,11 @@ param(
     [switch]$Execute,
     [ValidateSet("light", "moderate", "aggressive")]
     [string]$Level = "moderate",
+    [string]$Profile,
     [switch]$SkipRestorePoint,
-    [switch]$AutoRollbackOnError
+    [switch]$AutoRollbackOnError,
+    [switch]$ConfirmEach,
+    [switch]$SkipRegistryBackup
 )
 
 # ============================================================================
@@ -43,6 +55,7 @@ $script:RollbackCommands = @()
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectRoot = Split-Path -Parent $scriptDir
 $logsDir = Join-Path $projectRoot "data\audit_logs"
+$backupDir = Join-Path $projectRoot "data\backups"
 $timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
 
 # Ensure logs directory
@@ -51,6 +64,9 @@ if (-not (Test-Path $logsDir)) { New-Item -ItemType Directory -Path $logsDir -Fo
 $logFile = Join-Path $logsDir "$($timestamp)_execution.log"
 $rollbackFile = Join-Path $logsDir "$($timestamp)_rollback.ps1"
 $summaryFile = Join-Path $logsDir "$($timestamp)_summary.txt"
+$profilesPath = Join-Path $projectRoot "config\profiles.json"
+$registryBackupDir = Join-Path $backupDir "registry_$timestamp"
+$registryBackupUsed = $false
 
 # ============================================================================
 # LOGGING
@@ -93,6 +109,62 @@ function Write-Section {
     Write-Log ("=" * 60) "HEADER"
     Write-Log $Title "HEADER"
     Write-Log ("=" * 60) "HEADER"
+}
+
+function Confirm-Action {
+    param(
+        [string]$Prompt,
+        [bool]$IsDryRun
+    )
+    
+    if ($IsDryRun -or -not $ConfirmEach) {
+        return $true
+    }
+    
+    $answer = Read-Host $Prompt
+    return ($answer -eq "y" -or $answer -eq "Y")
+}
+
+function Get-ProfileData {
+    param([string]$ProfileName)
+    
+    if (-not $ProfileName) { return $null }
+    
+    if (-not (Test-Path $profilesPath)) {
+        Write-Log "Profile file not found: $profilesPath" "WARN"
+        return $null
+    }
+    
+    try {
+        $json = Get-Content -Path $profilesPath -Raw | ConvertFrom-Json
+        $profile = $null
+        
+        if ($json.profiles) {
+            foreach ($prop in $json.profiles.PSObject.Properties) {
+                if ($prop.Name -eq $ProfileName) {
+                    $profile = $prop.Value
+                    break
+                }
+            }
+        }
+        
+        if (-not $profile) {
+            Write-Log "Profile '$ProfileName' not found in profiles.json" "ERROR"
+            exit 1
+        }
+        
+        return $profile
+    }
+    catch {
+        Write-Log "Failed to load profile '$ProfileName': $($_.Exception.Message)" "ERROR"
+        exit 1
+    }
+}
+
+function Normalize-Name {
+    param([string]$Name)
+    if ($null -eq $Name) { return "" }
+    return $Name.ToLower()
 }
 
 # ============================================================================
@@ -211,13 +283,14 @@ function Set-RegistrySafe {
     param(
         [string]$Path,
         [string]$Name,
-        [int]$Value,
+        [object]$Value,
         [string]$Description,
+        [string]$Type = "DWord",
         [bool]$IsDryRun
     )
     
     if ($IsDryRun) {
-        Write-Log "WOULD SET: $Path\$Name = $Value" "DRYRUN"
+        Write-Log "WOULD SET: $Path\$Name = $Value ($Type)" "DRYRUN"
         Write-Log "  Reason: $Description" "DRYRUN"
         return $true
     }
@@ -234,12 +307,19 @@ function Set-RegistrySafe {
             New-Item -Path $Path -Force | Out-Null
         }
         
-        Set-ItemProperty -Path $Path -Name $Name -Value $Value -Type DWord -Force
+        switch ($Type) {
+            "DWord" { Set-ItemProperty -Path $Path -Name $Name -Value $Value -Type DWord -Force }
+            "String" { Set-ItemProperty -Path $Path -Name $Name -Value $Value -Type String -Force }
+            default {
+                Write-Log "Unsupported registry type '$Type' for $Path\$Name" "WARN"
+                return $false
+            }
+        }
         
         Write-Log "SET: $Path\$Name = $Value" "SUCCESS"
         
         if ($existed -and $null -ne $currentValue) {
-            Add-RollbackCommand "Restore $Name" "Set-ItemProperty -Path '$Path' -Name '$Name' -Value $currentValue -Type DWord"
+            Add-RollbackCommand "Restore $Name" "Set-ItemProperty -Path '$Path' -Name '$Name' -Value '$currentValue' -Type $Type"
         } else {
             Add-RollbackCommand "Remove $Name" "Remove-ItemProperty -Path '$Path' -Name '$Name' -ErrorAction SilentlyContinue"
         }
@@ -251,6 +331,47 @@ function Set-RegistrySafe {
         Write-Log "FAILED to set $Path\$Name : $($_.Exception.Message)" "ERROR"
         $script:ErrorCount++
         return $false
+    }
+}
+
+function Convert-RegistryPathForRegExe {
+    param([string]$Path)
+    
+    return $Path `
+        -replace '^HKCU:\\', 'HKCU\' `
+        -replace '^HKLM:\\', 'HKLM\'
+}
+
+function Backup-RegistryKeys {
+    param(
+        [array]$Keys,
+        [string]$OutputDir,
+        [bool]$IsDryRun
+    )
+    
+    if ($IsDryRun) {
+        Write-Log "WOULD BACKUP registry keys to $OutputDir" "DRYRUN"
+        return
+    }
+    
+    if (-not (Test-Path $OutputDir)) {
+        New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
+    }
+    
+    $uniquePaths = $Keys | ForEach-Object { $_.Path } | Sort-Object -Unique
+    foreach ($path in $uniquePaths) {
+        if (-not (Test-Path $path)) { continue }
+        
+        $regPath = Convert-RegistryPathForRegExe -Path $path
+        $safeName = ($regPath -replace '[\\/:*?"<>|]', '_')
+        $outFile = Join-Path $OutputDir "$safeName.reg"
+        
+        try {
+            & reg export $regPath $outFile /y | Out-Null
+            Write-Log "Backed up: $regPath -> $outFile" "INFO"
+        } catch {
+            Write-Log "Failed to backup $regPath : $($_.Exception.Message)" "WARN"
+        }
     }
 }
 
@@ -266,7 +387,7 @@ if ($Execute -and -not $isAdmin) {
 }
 
 if (-not $DryRun -and -not $Execute) {
-    Write-Host "Usage: .\execute_cleanup.ps1 -DryRun | -Execute [-Level light|moderate|aggressive]" -ForegroundColor Yellow
+    Write-Host "Usage: .\execute_cleanup.ps1 -DryRun | -Execute [-Level light|moderate|aggressive] [-Profile name] [-ConfirmEach]" -ForegroundColor Yellow
     exit 1
 }
 
@@ -279,10 +400,19 @@ Write-Host ""
 $mode = if ($DryRun) { "DRY RUN (Preview)" } else { "EXECUTE" }
 Write-Host "  Mode: $mode" -ForegroundColor $(if ($DryRun) { "Cyan" } else { "Yellow" })
 Write-Host "  Level: $Level" -ForegroundColor White
+if ($Profile) {
+    Write-Host "  Profile: $Profile" -ForegroundColor White
+}
 Write-Host "  Log: $logFile" -ForegroundColor DarkGray
 Write-Host ""
 
 Write-Log "Session started - Mode: $mode, Level: $Level" "INFO"
+
+$profileData = $null
+if ($Profile) {
+    $profileData = Get-ProfileData -ProfileName $Profile
+    Write-Log "Profile loaded: $Profile" "INFO"
+}
 
 if (-not $DryRun) {
     Initialize-Rollback
@@ -345,7 +475,6 @@ if ($Level -in @("moderate", "aggressive")) {
         @{Name="CortexLauncherService"; Reason="Razer Cortex - no real performance benefit"}
         @{Name="Razer Game Manager Service 3"; Reason="Razer game detection"}
         @{Name="RzActionSvc"; Reason="Razer macros - only if you use complex macros"}
-        @{Name="Steam Client Service"; Reason="Starts on-demand when needed"}
         @{Name="ClickToRunSvc"; Reason="Office starts this on-demand"}
         @{Name="Apple Mobile Device Service"; Reason="Only when syncing iPhone"}
         @{Name="Bonjour Service"; Reason="iTunes network discovery"}
@@ -361,10 +490,37 @@ if ($Level -eq "aggressive") {
     )
 }
 
+if ($profileData) {
+    $keepSet = @{}
+    foreach ($name in ($profileData.keep_services | Where-Object { $_ })) {
+        $keepSet[(Normalize-Name $name)] = $true
+    }
+    
+    $services = $services | Where-Object {
+        -not $keepSet.ContainsKey((Normalize-Name $_.Name))
+    }
+    
+    $existing = @{}
+    foreach ($svc in $services) {
+        $existing[(Normalize-Name $svc.Name)] = $true
+    }
+    
+    foreach ($name in ($profileData.disable_services | Where-Object { $_ })) {
+        $key = Normalize-Name $name
+        if (-not $existing.ContainsKey($key)) {
+            $services += @{Name=$name; Reason="Profile '$Profile' override"}
+        }
+    }
+}
+
 $foundServices = 0
 $notFoundServices = @()
 
 foreach ($svc in $services) {
+    if (-not (Confirm-Action -Prompt "Disable service $($svc.Name)? (y/N)" -IsDryRun $DryRun)) {
+        Write-Log "Skipped service: $($svc.Name)" "WARN"
+        continue
+    }
     $result = Disable-ServiceSafe -Name $svc.Name -Reason $svc.Reason -IsDryRun $DryRun
     if ($result) {
         $foundServices++
@@ -443,8 +599,110 @@ if ($Level -in @("moderate", "aggressive")) {
     )
 }
 
+if ($profileData -and $profileData.registry) {
+    foreach ($entry in $profileData.registry) {
+        if (-not $entry.path -or -not $entry.name) { continue }
+        
+        $regKeys += @{
+            Path = $entry.path
+            Name = $entry.name
+            Value = $entry.value
+            Type = if ($entry.type) { $entry.type } else { "DWord" }
+            Desc = "Profile '$Profile' override"
+        }
+    }
+}
+
+if (-not $DryRun -and -not $SkipRegistryBackup) {
+    Write-Section "REGISTRY BACKUP"
+    Backup-RegistryKeys -Keys $regKeys -OutputDir $registryBackupDir -IsDryRun $DryRun
+    $registryBackupUsed = $true
+}
+
 foreach ($key in $regKeys) {
-    Set-RegistrySafe -Path $key.Path -Name $key.Name -Value $key.Value -Description $key.Desc -IsDryRun $DryRun
+    if (-not (Confirm-Action -Prompt "Set registry $($key.Path)\$($key.Name)? (y/N)" -IsDryRun $DryRun)) {
+        Write-Log "Skipped registry: $($key.Path)\$($key.Name)" "WARN"
+        continue
+    }
+    
+    $type = if ($key.ContainsKey("Type")) { $key.Type } else { "DWord" }
+    Set-RegistrySafe -Path $key.Path -Name $key.Name -Value $key.Value -Description $key.Desc -Type $type -IsDryRun $DryRun
+}
+
+# ============================================================================
+# STARTUP ITEMS
+# ============================================================================
+
+Write-Section "STARTUP ITEMS"
+
+$startupItems = @()
+if ($Level -in @("moderate", "aggressive")) {
+    $startupItems += @("iCloud", "iCloudDrive", "iCloud Services")
+}
+
+if ($profileData -and $profileData.disable_startup_items) {
+    $startupItems += $profileData.disable_startup_items
+}
+
+$startupItems = $startupItems | Where-Object { $_ } | Sort-Object -Unique
+
+if ($startupItems.Count -gt 0) {
+    $startupManagerPath = Join-Path $projectRoot "src\executors\startup_manager.ps1"
+    if (Test-Path $startupManagerPath) {
+        . $startupManagerPath
+    } else {
+        Write-Log "Startup manager not found at $startupManagerPath" "WARN"
+    }
+}
+
+$startupProcessed = 0
+foreach ($item in $startupItems) {
+    if (-not (Confirm-Action -Prompt "Disable startup item $item? (y/N)" -IsDryRun $DryRun)) {
+        Write-Log "Skipped startup item: $item" "WARN"
+        continue
+    }
+    
+    if (-not (Get-Command Get-StartupItem -ErrorAction SilentlyContinue)) {
+        Write-Log "Startup management functions unavailable. Skipping startup items." "WARN"
+        break
+    }
+    
+    $entries = Get-StartupItem -Name $item
+    if (-not $entries -or $entries.Count -eq 0) {
+        Write-Log "Startup item not found: $item" "INFO"
+        continue
+    }
+    
+    if ($DryRun) {
+        Write-Log "WOULD DISABLE STARTUP: $item" "DRYRUN"
+        $startupProcessed++
+        continue
+    }
+    
+    try {
+        $removeResults = Remove-StartupItem -Name $item
+        foreach ($res in $removeResults) {
+            Write-Log "Removed startup entry: $item ($($res.Location))" "SUCCESS"
+            Add-RollbackCommand "Restore startup entry $item ($($res.Location))" $res.RollbackCommand
+        }
+        
+        $disableResults = Disable-StartupItem -Name $item
+        foreach ($res in $disableResults) {
+            Write-Log "Disabled startup approval: $item ($($res.Location))" "SUCCESS"
+            Add-RollbackCommand "Restore startup approval $item ($($res.Location))" $res.RollbackCommand
+        }
+        
+        if ($removeResults.Count -eq 0 -and $disableResults.Count -eq 0) {
+            Write-Log "No startup changes needed for: $item" "INFO"
+        } else {
+            $script:SuccessCount++
+        }
+        
+        $startupProcessed++
+    } catch {
+        Write-Log "Failed to update startup item $item : $($_.Exception.Message)" "ERROR"
+        $script:ErrorCount++
+    }
 }
 
 # ============================================================================
@@ -476,14 +734,35 @@ if ($Level -in @("moderate", "aggressive")) {
     )
 }
 
+if ($profileData -and $profileData.disable_tasks) {
+    foreach ($fullPath in $profileData.disable_tasks) {
+        if (-not $fullPath) { continue }
+        $lastSlash = $fullPath.LastIndexOf("\")
+        if ($lastSlash -lt 1) { continue }
+        $taskPath = $fullPath.Substring(0, $lastSlash + 1)
+        $taskName = $fullPath.Substring($lastSlash + 1)
+        if (-not $taskName) { continue }
+        
+        $tasksToDisable += @{
+            Path = $taskPath
+            Name = $taskName
+            Reason = "Profile '$Profile' override"
+        }
+    }
+}
+
 $taskCount = 0
 foreach ($task in $tasksToDisable) {
     $fullPath = $task.Path + $task.Name
     try {
         $existingTask = Get-ScheduledTask -TaskPath $task.Path -TaskName $task.Name -ErrorAction SilentlyContinue
         if ($existingTask) {
+            if (-not (Confirm-Action -Prompt "Disable task $fullPath? (y/N)" -IsDryRun $DryRun)) {
+                Write-Log "Skipped task: $fullPath" "WARN"
+                continue
+            }
             if ($DryRun) {
-                Write-Log "WOULD DISABLE: $fullPath" "DRYRUN" "[->]"
+                Write-Log "WOULD DISABLE: $fullPath" "DRYRUN"
                 Write-Log "  Reason: $($task.Reason)" "DRYRUN"
             } else {
                 Disable-ScheduledTask -TaskPath $task.Path -TaskName $task.Name -ErrorAction Stop | Out-Null
@@ -513,10 +792,18 @@ REAPER Execution Summary
 Time: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
 Mode: $mode
 Level: $Level
+"@
+
+if ($Profile) {
+    $summaryText += "`nProfile: $Profile"
+}
+
+$summaryText += @"
 
 Results:
   Services processed: $foundServices
   Registry keys: $($regKeys.Count)
+  Startup items: $startupProcessed
   Scheduled tasks: $taskCount
   Successful: $($script:SuccessCount)
   Failed: $($script:ErrorCount)
@@ -526,6 +813,10 @@ Log file: $logFile
 
 if (-not $DryRun) {
     $summaryText += "`nRollback: $rollbackFile"
+}
+
+if ($registryBackupUsed) {
+    $summaryText += "`nRegistry backup: $registryBackupDir"
 }
 
 Write-Host $summaryText

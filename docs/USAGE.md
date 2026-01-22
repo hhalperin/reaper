@@ -55,6 +55,22 @@ Edit `config/manifest.yaml` to customize decisions.
 
 Levels: `light`, `moderate`, `aggressive`
 
+Profiles (optional):
+
+```powershell
+.\scripts\execute_cleanup.ps1 -Execute -Profile gaming_steam
+```
+
+Interactive review:
+
+```powershell
+.\scripts\execute_cleanup.ps1 -Execute -ConfirmEach
+```
+
+Other options:
+- `-SkipRegistryBackup` - Skip exporting registry backups
+- `-SkipRestorePoint` - Skip restore point creation
+
 ### 6. Install Protection
 
 ```powershell
@@ -62,6 +78,20 @@ Levels: `light`, `moderate`, `aggressive`
 ```
 
 Runs after each logon to re-apply settings Windows might revert.
+
+With a profile:
+
+```powershell
+.\scripts\install_protection_task.ps1 -Profile gaming_steam
+```
+
+## Diff Reports
+
+Compare the two latest inventory snapshots:
+
+```powershell
+python scripts/diff_inventory.py
+```
 
 ## Rollback
 
@@ -82,4 +112,7 @@ If something breaks:
 | `data/inventories/` | System snapshots |
 | `data/analysis/` | Suspect analysis |
 | `data/audit_logs/` | Execution logs, rollback scripts |
+| `data/backups/` | Registry backups |
+| `data/reports/` | Inventory diffs |
 | `config/manifest.yaml` | Keep/remove decisions |
+| `config/profiles.json` | Profile presets |

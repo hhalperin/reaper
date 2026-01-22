@@ -25,11 +25,16 @@ data/analysis/*.yaml
 data/analysis/*.json
 data/audit_logs/*.log
 data/audit_logs/*.ps1
+data/audit_logs/*.txt
+data/backups/*
+data/reports/*
 
 # But keep .gitkeep files
 !data/inventories/.gitkeep
 !data/analysis/.gitkeep
 !data/audit_logs/.gitkeep
+!data/backups/.gitkeep
+!data/reports/.gitkeep
 
 # OS
 .DS_Store
@@ -43,3 +48,6 @@ desktop.ini
 
 # MCP config (contains tokens)
 .cursor/mcp.json
+
+# Secrets
+.env

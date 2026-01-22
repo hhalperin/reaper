@@ -20,6 +20,7 @@
 param(
     [ValidateSet("light", "moderate", "aggressive")]
     [string]$Level = "moderate",
+    [string]$Profile,
     [switch]$SkipProtectionTask,
     [switch]$DryRun
 )
@@ -58,6 +59,9 @@ Write-Host "    3. Block telemetry and ads via registry" -ForegroundColor Gray
 Write-Host "    4. Install protection task (re-applies after updates)" -ForegroundColor Gray
 Write-Host ""
 Write-Host "  Level: $Level" -ForegroundColor Yellow
+if ($Profile) {
+    Write-Host "  Profile: $Profile" -ForegroundColor Yellow
+}
 Write-Host ""
 
 if ($DryRun) {
@@ -84,7 +88,8 @@ Write-Host "  STEP 1/2: Running cleanup..." -ForegroundColor Cyan
 Write-Host ""
 
 $cleanupScript = Join-Path $scriptDir "execute_cleanup.ps1"
-$cleanupArgs = if ($DryRun) { "-DryRun -Level $Level" } else { "-Execute -Level $Level -AutoRollbackOnError" }
+$profileArg = if ($Profile) { "-Profile $Profile" } else { "" }
+$cleanupArgs = if ($DryRun) { "-DryRun -Level $Level $profileArg" } else { "-Execute -Level $Level -AutoRollbackOnError $profileArg" }
 
 & powershell.exe -ExecutionPolicy Bypass -File $cleanupScript $cleanupArgs.Split(" ")
 
@@ -111,16 +116,26 @@ if (-not $SkipProtectionTask -and -not $DryRun) {
         $protectionScript = Join-Path $scriptDir "post_update_check.ps1"
         
         $action = New-ScheduledTaskAction -Execute "powershell.exe" `
-            -Argument "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$protectionScript`" -AutoReapply -Level $Level"
+            -Argument "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$protectionScript`" -AutoReapply -Level $Level $profileArg"
         
-        # Trigger: After Windows Update completes
-        $trigger = New-ScheduledTaskTrigger -AtLogOn
+        # Trigger: Windows Update event + logon fallback
+        $subscription = @"
+<QueryList>
+  <Query Id="0" Path="Microsoft-Windows-WindowsUpdateClient/Operational">
+    <Select Path="Microsoft-Windows-WindowsUpdateClient/Operational">
+      *[System[(EventID=19 or EventID=20)]]
+    </Select>
+  </Query>
+</QueryList>
+"@
+        $triggerEvent = New-ScheduledTaskTrigger -OnEvent -Subscription $subscription
+        $triggerLogon = New-ScheduledTaskTrigger -AtLogOn
         
         $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
         
         $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
         
-        Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description "REAPER: Re-applies service settings after Windows Update" | Out-Null
+        Register-ScheduledTask -TaskName $taskName -Action $action -Trigger @($triggerEvent, $triggerLogon) -Principal $principal -Settings $settings -Description "REAPER: Re-applies service settings after Windows Update" | Out-Null
         
         Write-Host "  ✓ Protection task installed: $taskName" -ForegroundColor Green
     }

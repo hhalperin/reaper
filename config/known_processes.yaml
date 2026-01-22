@@ -873,12 +873,12 @@ WSLService:
   category: utility
   publisher: Valve
   purpose: Steam background service for game installs/updates
-  recommendation: DISABLE
+  recommendation: KEEP
   safety_rating: SAFE
   notes: |
-    Steam starts this ON-DEMAND when needed.
-    Does NOT need to run constantly.
-    Impact: Steam launches ~1 second slower. Games work normally.
+    REQUIRED for Steam to function properly.
+    Handles game installations, updates, and some DRM.
+    Set to Manual startup - only runs when Steam needs it.
 
 # =============================================================================
 # STARTUP ITEMS - Various
